@@ -1,0 +1,542 @@
+{
+    "UUID": "18b5f976cdf897682ee413720e77a8986ceadd2d",
+    "fileType": "Plan",
+    "geoFence": {
+        "circles": [
+        ],
+        "polygons": [
+            {
+                "inclusion": true,
+                "polygon": [
+                    [
+                        52.282599366629,
+                        6.864644466619154
+                    ],
+                    [
+                        52.29132654581896,
+                        6.902744730087136
+                    ],
+                    [
+                        52.28661072881356,
+                        6.915918601884101
+                    ],
+                    [
+                        52.2830192805577,
+                        6.91078335454705
+                    ],
+                    [
+                        52.27591560765218,
+                        6.893539021753156
+                    ],
+                    [
+                        52.27399925141548,
+                        6.874775277212848
+                    ]
+                ],
+                "version": 1
+            }
+        ],
+        "version": 2
+    },
+    "groundStation": "QGroundControl",
+    "mission": {
+        "cruiseSpeed": 28,
+        "firmwareType": 12,
+        "globalPlanAltitudeMode": 1,
+        "hoverSpeed": 8,
+        "items": [
+            {
+                "AMSLAltAboveTerrain": 30,
+                "Altitude": 30,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "1",
+                "autoContinue": true,
+                "command": 22,
+                "doJumpId": 1,
+                "frame": 3,
+                "params": [
+                    15,
+                    0,
+                    0,
+                    null,
+                    52.2825397,
+                    6.8984103,
+                    30
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 60,
+                "Altitude": 60,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "2",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 2,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.282621788072355,
+                    6.899123795064099,
+                    60
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "MISSION_ITEM_ID": "3",
+                "autoContinue": true,
+                "command": 3000,
+                "doJumpId": 3,
+                "frame": 2,
+                "params": [
+                    4,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 60,
+                "Altitude": 60,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "4",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 4,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.283469281929435,
+                    6.901718910689311,
+                    60
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 80,
+                "Altitude": 80,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "5",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 5,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28528971356268,
+                    6.906843683019673,
+                    80
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 85,
+                "Altitude": 85,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "6",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 6,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28619508983822,
+                    6.907700944308999,
+                    85
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 90,
+                "Altitude": 90,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "7",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 7,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28700933019922,
+                    6.906646500436068,
+                    90
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 95,
+                "Altitude": 95,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "8",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 8,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28691788742173,
+                    6.904588489118652,
+                    95
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "9",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 9,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.27967402543756,
+                    6.889267721564778,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "10",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 10,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.27892018775579,
+                    6.878703588517652,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "11",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 11,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.27938806255716,
+                    6.876429240060219,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "12",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 12,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.280655681513785,
+                    6.87645870522141,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "13",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 13,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28111306136718,
+                    6.878545693531606,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "14",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 14,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.281507456033765,
+                    6.897465752194307,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "15",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 15,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28521598112396,
+                    6.907070280875956,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "16",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 16,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28623948195102,
+                    6.908008241913279,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "17",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 17,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28716558760136,
+                    6.906745978228713,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 120,
+                "Altitude": 120,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "18",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 18,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.286970052792455,
+                    6.9044260509882065,
+                    120
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "MISSION_ITEM_ID": "19",
+                "autoContinue": true,
+                "command": 177,
+                "doJumpId": 19,
+                "frame": 2,
+                "params": [
+                    9,
+                    10,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 80,
+                "Altitude": 80,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "20",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 20,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28381947097879,
+                    6.901992010013913,
+                    80
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 80,
+                "Altitude": 80,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "21",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 21,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.28359581342248,
+                    6.901531233711353,
+                    80
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 80,
+                "Altitude": 80,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "22",
+                "autoContinue": true,
+                "command": 16,
+                "doJumpId": 22,
+                "frame": 3,
+                "params": [
+                    0,
+                    0,
+                    0,
+                    null,
+                    52.282698275017026,
+                    6.898977026507282,
+                    80
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "MISSION_ITEM_ID": "23",
+                "autoContinue": true,
+                "command": 3000,
+                "doJumpId": 23,
+                "frame": 2,
+                "params": [
+                    3,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "SimpleItem"
+            },
+            {
+                "AMSLAltAboveTerrain": 0,
+                "Altitude": 0,
+                "AltitudeMode": 1,
+                "MISSION_ITEM_ID": "24",
+                "autoContinue": true,
+                "command": 21,
+                "doJumpId": 24,
+                "frame": 3,
+                "params": [
+                    0,
+                    1,
+                    0,
+                    null,
+                    52.2825397,
+                    6.8984103,
+                    0
+                ],
+                "type": "SimpleItem"
+            }
+        ],
+        "landingDuration": 40,
+        "plannedHomePosition": [
+            52.2825397,
+            6.8984103,
+            40.44
+        ],
+        "takeoffDuration": 15,
+        "totalDuration": 2083.01627606864,
+        "vehicleType": 20,
+        "version": 2
+    },
+    "rallyPoints": {
+        "points": [
+            [
+                52.282504959546564,
+                6.898488645574076,
+                0
+            ]
+        ],
+        "version": 2
+    },
+    "version": 1
+}
