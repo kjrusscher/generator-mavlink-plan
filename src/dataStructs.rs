@@ -10,7 +10,7 @@ pub struct GeoFencePolygon {
 #[derive(Serialize)]
 pub struct GeoFence {
     pub circles: Vec<i32>,
-    pub polygons: GeoFencePolygon,
+    pub polygons: [GeoFencePolygon; 1],
     pub version: i32,
 }
 
@@ -25,11 +25,12 @@ pub struct MavLinkSimpleItem {
     pub AMSLAltAboveTerrain: i32,
     pub Altitude: i32,
     pub AltitudeMode: i32,
+    pub MISSION_ITEM_ID: i32,
     pub autoContinue: bool,
     pub command: i32,
     pub doJumpId: i32,
     pub frame: i32,
-    pub params: [f64; 7],
+    pub params: [Option<f64>; 7],
     #[serde(rename = "type")] 
     pub type_name: String,
 }
@@ -46,10 +47,10 @@ pub struct Mission {
 
 #[derive(Serialize)]
 pub struct MavLinkPlan {
-    pub filetype: String,
-    // pub geoFence: GeoFence,
+    pub fileType: String,
+    pub geoFence: GeoFence,
     pub groundStation: String,
-    // pub mission: Mission,
-    // pub rallyPoints: RallyPoints,
+    pub mission: Mission,
+    pub rallyPoints: RallyPoints,
     pub version: u8,
 }

@@ -1,5 +1,7 @@
 pub mod dataStructs;
 
+use serde_json::ser::PrettyFormatter;
+use serde::Serialize;
 use std::fs::File;
 use std::io::BufWriter;
 
@@ -19,15 +21,54 @@ fn main() {
         ],
     };
 
-    
+    let geo_fence = GeoFence {
+        circles: vec![],
+        polygons: [geo_fence_polygon],
+        version: 2,
+    };
+
+    let rally_points = RallyPoints {
+        points: vec![[52.282504959546564, 6.898488645574076, 0.0]],
+        version: 2,
+    };
+
+    let item = MavLinkSimpleItem {
+        AMSLAltAboveTerrain: 30,
+        Altitude: 30,
+        AltitudeMode: 1,
+        MISSION_ITEM_ID: 1,
+        autoContinue: true,
+        command: 22,
+        doJumpId: 1,
+        frame: 3,
+        params: [
+            Some(15.0),
+            Some(0.0),
+            Some(0.0),
+            None,
+            Some(52.2825397),
+            Some(6.8984103),
+            Some(30.0),
+        ],
+        type_name: "SimpleItem".to_string(),
+    };
+
+    let missio_n = Mission {
+        cruiseSpeed: 28,
+        firmwareType: 12,
+        globalPlanAltitudeMode: 1,
+        hoverSpeed: 8,
+        items: vec![item],
+        plannedHomePosition: [52.2825397, 6.8984103, 40.44],
+    };
 
     let plan: MavLinkPlan = MavLinkPlan {
-        filetype: "Plan".to_string(),
+        fileType: "Plan".to_string(),
         version: 1,
-        // geoFence: dataStructs::GeoFence,
+        geoFence: geo_fence,
         groundStation: "QGroundControl".to_string(),
-        // mission: null(),
-        // rallyPoints: null()
+        mission: missio_n,
+        rallyPoints: rally_points,
     };
 
     // Create a file to save the formatted JSON
