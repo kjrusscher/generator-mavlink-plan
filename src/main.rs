@@ -1,11 +1,12 @@
 pub mod dataStructs;
 
-use std::borrow::BorrowMut;
-
-// use std::fs::File;
-// use std::io::BufWriter;
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, vertical_space};
+use iced::{Alignment, Element, Length, Sandbox, Settings};
+use notify_rust::Notification;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufWriter;
 
 use crate::dataStructs::*;
 
@@ -36,29 +37,6 @@ struct WeatherData {
     elevation: f64,
     hourly_units: HourlyUnit,
     hourly: HourlyData,
-}
-
-// fn main() {
-//     let mut plan = MavLinkPlan::new();
-
-//     // plan.mission.items[0].MISSION_ITEM_ID = Some(1);
-//     // plan.mission.items[0].doJumpId = Some(1);
-
-//     // Create a file to save the formatted JSON
-//     let file = File::create("weather_info.plan").expect("Failed to create file");
-//     let writer = BufWriter::new(file);
-
-//     // Serialize and format the data with newlines and indentation
-//     serde_json::to_writer_pretty(writer, &plan).expect("Failed to write JSON data to file");
-
-//     println!("Data has been saved as 'weather_info.json'");
-
-// }
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, vertical_space};
-use iced::{Alignment, Element, Length, Sandbox, Settings};
-
-pub fn main() -> iced::Result {
-    MavlinkPlanGenerator::run(Settings::default())
 }
 
 #[derive(Debug, Clone)]
@@ -146,14 +124,24 @@ impl Sandbox for MavlinkPlanGenerator {
                 };
             }
             Message::SavePressed => {
-                println!(
-                    "{}",
-                    self.data
-                        .get(&self.selected_time.clone().unwrap())
-                        .unwrap()
-                        .direction_10m
-                        .unwrap()
-                );
+                if self.selected_time.is_some() {
+                    let file_name =
+                        format!("vluchtplan_{}.plan", self.selected_time.as_ref().unwrap());
+
+                    // Create a file to save the formatted JSON
+                    let file = File::create(&file_name).expect("Failed to create file");
+                    let writer = BufWriter::new(file);
+
+                    // Serialize and format the data with newlines and indentation
+                    serde_json::to_writer_pretty(writer, &self.plan)
+                        .expect("Failed to write JSON data to file");
+
+                    Notification::new()
+                        .summary("Bestand Opgeslagen")
+                        .body(&file_name)
+                        .show()
+                        .unwrap();
+                }
             }
         }
     }
@@ -169,8 +157,7 @@ impl Sandbox for MavlinkPlanGenerator {
         let start_location_text = text(format!("Drone positie:")).size(25);
         let start_location_gps = text(format!(
             "long: {:.2}, latt: {:.2}",
-            self.plan.mission.plannedHomePosition[0],
-            self.plan.mission.plannedHomePosition[1]
+            self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
         ))
         .size(20);
 
@@ -188,13 +175,13 @@ impl Sandbox for MavlinkPlanGenerator {
         .spacing(10);
 
         let wind_direction_10 = text(format!(
-            "10 meter: {}{}",
+            " 10 meter: {}{}",
             self.wind_data.direction_10m.unwrap_or(0).to_string(),
             self.weather_data.hourly_units.winddirection_10m.to_string()
         ))
         .size(20);
         let wind_direction_80 = text(format!(
-            "80 meter: {}{}",
+            " 80 meter: {}{}",
             self.wind_data.direction_80m.unwrap_or(0).to_string(),
             self.weather_data.hourly_units.winddirection_80m.to_string()
         ))
@@ -202,7 +189,10 @@ impl Sandbox for MavlinkPlanGenerator {
         let wind_direction_120 = text(format!(
             "120 meter: {}{}",
             self.wind_data.direction_120m.unwrap_or(0).to_string(),
-            self.weather_data.hourly_units.winddirection_120m.to_string()
+            self.weather_data
+                .hourly_units
+                .winddirection_120m
+                .to_string()
         ))
         .size(20);
 
@@ -218,12 +208,17 @@ impl Sandbox for MavlinkPlanGenerator {
         .align_items(Alignment::Center)
         .spacing(10);
 
-        let button = button("Bestand Opslaan").on_press(Message::SavePressed);
+        let button = button("Opslaan").on_press(Message::SavePressed);
 
-        let right_column = column![vertical_space(60), button, vertical_space(600)]
-            .width(Length::Fill)
-            .align_items(Alignment::Center)
-            .spacing(10);
+        let right_column = column![
+            vertical_space(60),
+            text(format!("Vluchtplan")).size(25),
+            button,
+            vertical_space(600)
+        ]
+        .width(Length::Fill)
+        .align_items(Alignment::Center)
+        .spacing(10);
 
         let content = row![left_column, middle_column, right_column]
             .align_items(Alignment::Center)
@@ -236,4 +231,8 @@ impl Sandbox for MavlinkPlanGenerator {
             .center_y()
             .into()
     }
+}
+
+pub fn main() -> iced::Result {
+    MavlinkPlanGenerator::run(Settings::default())
 }
