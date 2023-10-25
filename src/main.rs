@@ -47,7 +47,7 @@ struct WindData {
 }
 
 struct MavlinkPlanGenerator {
-    plan: MavLinkPlan,
+    plan: Option<MavLinkPlan>,
     weather_data: WeatherData,
     data: HashMap<String, WindData>,
     selected_time: Option<String>,
@@ -79,7 +79,7 @@ impl Sandbox for MavlinkPlanGenerator {
         }
 
         MavlinkPlanGenerator {
-            plan: MavLinkPlan::new(),
+            plan: None,
             data: data,
             weather_data: weather_info,
             selected_time: None,
@@ -99,12 +99,6 @@ impl Sandbox for MavlinkPlanGenerator {
         match message {
             Message::OptionSelected(time) => {
                 self.selected_time = Some(time);
-                println!(
-                    "{0}",
-                    self.selected_time
-                        .clone()
-                        .unwrap_or("No time set".to_string())
-                );
                 self.wind_data = WindData {
                     direction_10m: self
                         .data
@@ -122,6 +116,7 @@ impl Sandbox for MavlinkPlanGenerator {
                         .unwrap()
                         .direction_120m,
                 };
+                self.plan = Some(MavLinkPlan::new(self.wind_data.direction_10m.unwrap(), self.wind_data.direction_80m.unwrap()));
             }
             Message::SavePressed => {
                 if self.selected_time.is_some() {
@@ -156,8 +151,8 @@ impl Sandbox for MavlinkPlanGenerator {
 
         let start_location_text = text(format!("Drone positie:")).size(25);
         let start_location_gps = text(format!(
-            "long: {:.2}, latt: {:.2}",
-            self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
+            "long: {:.2}, latt: {:.2}", 52.2825397,6.8984103
+            // self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
         ))
         .size(20);
 

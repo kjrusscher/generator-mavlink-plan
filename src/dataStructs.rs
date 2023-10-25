@@ -1,5 +1,6 @@
+use geo;
+use geographiclib_rs::{Geodesic, DirectGeodesic};
 use serde::Serialize;
-use serde_json::map::IterMut;
 use serde_repr::Serialize_repr;
 
 // This enum is also in the mavlink crate. It's there under mavlink::common::MavCmd.
@@ -10,6 +11,7 @@ pub enum MavCmd {
     MAV_CMD_NAV_WAYPOINT = 16,
     MAV_CMD_NAV_LAND = 21,
     MAV_CMD_NAV_TAKEOFF = 22,
+    MAV_CMD_CONDITION_YAW = 115,
     MAV_CMD_DO_JUMP = 177,
     MAV_CMD_DO_VTOL_TRANSITION = 3000,
 }
@@ -158,28 +160,53 @@ impl Default for MavLinkPlan {
 }
 
 impl MavLinkPlan {
-    pub fn new() -> MavLinkPlan {
+    pub fn new(wind_direction_10m: i32, wind_direction_80m: i32) -> MavLinkPlan {
         let mut plan = MavLinkPlan::default();
+        let geod = Geodesic::wgs84();
+
+        let direction_take_off = f64::from(wind_direction_10m);
+        let direction_landing: f64;
+        if direction_take_off < 180.0 {
+            direction_landing = f64::from(wind_direction_10m)+180.0;
+        } else {
+            direction_landing = f64::from(wind_direction_10m)-180.0;
+        }
+
+        let home = geo::Point::new(52.2825397,6.8984103);
+        let (mut lat, mut lon) = geod.direct(home.x(), home.y(), 30.0, 35.0);
+        let vtol_transition = geo::Point::new(lat, lon);
 
         plan.add_special_waypoint(
-            1,
             Some(30),
             MavCmd::MAV_CMD_NAV_TAKEOFF,
             [
                 Some(15.0),
                 Some(0.0),
                 Some(0.0),
-                None,
-                Some(52.2825397),
-                Some(6.8984103),
+                Some(direction_take_off),
+                Some(home.x()),
+                Some(home.y()),
                 Some(30.0),
             ],
         );
 
-        plan.add_waypoint(2, 60, 52.282621788072355, 6.899123795064099);
+        plan.add_special_waypoint(
+            None,
+            MavCmd::MAV_CMD_CONDITION_YAW,
+            [
+                Some(direction_take_off),
+                Some(22.5),
+                Some(1.0),
+                Some(0.0),
+                None,
+                None,
+                None,
+            ],
+        );
+        
+        plan.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
 
         plan.add_special_waypoint(
-            3,
             None,
             MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
             [
@@ -193,43 +220,48 @@ impl MavLinkPlan {
             ],
         );
 
-        plan.add_waypoint(4, 60, 52.283469281929435, 6.901718910689311);
-        plan.add_waypoint(5, 80, 52.28528971356268, 6.906843683019673);
-        plan.add_waypoint(6, 85, 52.28619508983822, 6.907700944308999);
-        plan.add_waypoint(7, 90, 52.28700933019922, 6.906646500436068);
-        plan.add_waypoint(8, 95, 52.28691788742173, 6.904588489118652);
-        plan.add_waypoint(9, 120, 52.27967402543756, 6.889267721564778);
-        plan.add_waypoint(10, 120, 52.27892018775579, 6.878703588517652);
-        plan.add_waypoint(11, 120, 52.27938806255716, 6.876429240060219);
-        plan.add_waypoint(12, 120, 52.280655681513785, 6.87645870522141);
-        plan.add_waypoint(13, 120, 52.28111306136718, 6.878545693531606);
-        plan.add_waypoint(14, 120, 52.281507456033765, 6.897465752194307);
-        plan.add_waypoint(15, 120, 52.28521598112396, 6.907070280875956);
-        plan.add_waypoint(16, 120, 52.28623948195102, 6.908008241913279);
-        plan.add_waypoint(17, 120, 52.28716558760136, 6.906745978228713);
-        plan.add_waypoint(18, 120, 52.286970052792455, 6.9044260509882065);
+        (lat, lon) = geod.direct(vtol_transition.x(), vtol_transition.y(), direction_take_off, 210.0);
+        let mut current_point = geo::Point::new(lat, lon);
+        plan.add_waypoint(60, current_point.x(), current_point.y());
+
+        // plan.add_waypoint(80, 52.28528971356268, 6.906843683019673);
+        // plan.add_waypoint(85, 52.28619508983822, 6.907700944308999);
+        // plan.add_waypoint(90, 52.28700933019922, 6.906646500436068);
+        // plan.add_waypoint(95, 52.28691788742173, 6.904588489118652);
+        // plan.add_waypoint(120, 52.27967402543756, 6.889267721564778);
+        // plan.add_waypoint(120, 52.27892018775579, 6.878703588517652);
+        // plan.add_waypoint(120, 52.27938806255716, 6.876429240060219);
+        // plan.add_waypoint(120, 52.280655681513785, 6.87645870522141);
+        // plan.add_waypoint(120, 52.28111306136718, 6.878545693531606);
+        // plan.add_waypoint(120, 52.281507456033765, 6.897465752194307);
+        // plan.add_waypoint(120, 52.28521598112396, 6.907070280875956);
+        // plan.add_waypoint(120, 52.28623948195102, 6.908008241913279);
+        // plan.add_waypoint(120, 52.28716558760136, 6.906745978228713);
+        // plan.add_waypoint(120, 52.286970052792455, 6.9044260509882065);
+
+        // plan.add_special_waypoint(
+        //     None,
+        //     MavCmd::MAV_CMD_DO_JUMP,
+        //     [
+        //         Some(9.0),
+        //         Some(10.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //     ],
+        // );
+
+        // plan.add_waypoint(80, 52.28381947097879, 6.901992010013913);
+
+        (lat, lon) = geod.direct(vtol_transition.x(), vtol_transition.y(), direction_landing, 210.0);
+        current_point = geo::Point::new(lat, lon);
+        plan.add_waypoint(60, current_point.x(), current_point.y());
+        
+        plan.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
 
         plan.add_special_waypoint(
-            19,
-            None,
-            MavCmd::MAV_CMD_DO_JUMP,
-            [
-                Some(9.0),
-                Some(10.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-            ],
-        );
-
-        plan.add_waypoint(20, 80, 52.28381947097879, 6.901992010013913);
-        plan.add_waypoint(21, 80, 52.28359581342248, 6.901531233711353);
-        plan.add_waypoint(22, 80, 52.282698275017026, 6.898977026507282);
-
-        plan.add_special_waypoint(
-            23,
             None,
             MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
             [
@@ -244,7 +276,6 @@ impl MavLinkPlan {
         );
 
         plan.add_special_waypoint(
-            24,
             Some(0),
             MavCmd::MAV_CMD_NAV_LAND,
             [
@@ -252,8 +283,8 @@ impl MavLinkPlan {
                 Some(1.0),
                 Some(0.0),
                 None,
-                Some(52.2825397),
-                Some(6.8984103),
+                Some(home.x()),
+                Some(home.y()),
                 Some(0.0),
             ],
         );
@@ -261,8 +292,9 @@ impl MavLinkPlan {
         return plan;
     }
 
-    pub fn add_waypoint(&mut self, id: i32, height: i32, latitude: f64, longitude: f64) {
+    pub fn add_waypoint(&mut self, height: i32, latitude: f64, longitude: f64) {
         let mut waypoint = MavLinkSimpleItem::default();
+        let id: i32 = (self.mission.items.len() as i32) + 1;
         waypoint.AMSLAltAboveTerrain = Some(height);
         waypoint.Altitude = Some(height);
         waypoint.MISSION_ITEM_ID = Some(id);
@@ -282,12 +314,12 @@ impl MavLinkPlan {
 
     pub fn add_special_waypoint(
         &mut self,
-        id: i32,
         height: Option<i32>,
         command: MavCmd,
         params: [Option<f64>; 7],
     ) {
         let mut waypoint = MavLinkSimpleItem::default();
+        let id: i32 = (self.mission.items.len() as i32) + 1;
         waypoint.AMSLAltAboveTerrain = height;
         waypoint.Altitude = height;
         waypoint.MISSION_ITEM_ID = Some(id);
