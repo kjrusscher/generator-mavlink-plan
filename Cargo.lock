@@ -1139,6 +1139,7 @@ name = "generator-mavlink-plan"
 version = "0.1.0"
 dependencies = [
  "geo",
+ "geo-types",
  "geographiclib-rs",
  "iced",
  "iced_native",
@@ -1174,7 +1175,6 @@ dependencies = [
  "num-traits",
  "robust",
  "rstar",
- "serde",
 ]
 
 [[package]]

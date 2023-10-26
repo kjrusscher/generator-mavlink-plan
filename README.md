@@ -15,3 +15,5 @@
 | Nominal cruise airspeed | 28 m/s (101 km/h) |
 | Max cruise airspeed | 32 m/s (115 km/h) |
 | Never exceed airspeed | 35 m/s (126 km/h) |
+
+SkyOps

@@ -1,5 +1,5 @@
 use geo;
-use geographiclib_rs::{Geodesic, DirectGeodesic};
+use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use serde::Serialize;
 use serde_repr::Serialize_repr;
 
@@ -11,7 +11,6 @@ pub enum MavCmd {
     MAV_CMD_NAV_WAYPOINT = 16,
     MAV_CMD_NAV_LAND = 21,
     MAV_CMD_NAV_TAKEOFF = 22,
-    MAV_CMD_CONDITION_YAW = 115,
     MAV_CMD_DO_JUMP = 177,
     MAV_CMD_DO_VTOL_TRANSITION = 3000,
 }
@@ -167,13 +166,20 @@ impl MavLinkPlan {
         let direction_take_off = f64::from(wind_direction_10m);
         let direction_landing: f64;
         if direction_take_off < 180.0 {
-            direction_landing = f64::from(wind_direction_10m)+180.0;
+            direction_landing = f64::from(wind_direction_10m) + 180.0;
         } else {
-            direction_landing = f64::from(wind_direction_10m)-180.0;
+            direction_landing = f64::from(wind_direction_10m) - 180.0;
         }
+        
+        let position_pilot = geo::Point::new(52.282432, 6.898313);
+        let position_home_drone = geo::Point::new(52.282578, 6.898316);
+        // Calculate the azimuth from p1 to p2.
+        let (azi1, _, _) = geod.inverse(position_pilot.x(), position_pilot.y(), position_home_drone.x(), position_home_drone.y());
 
-        let home = geo::Point::new(52.2825397,6.8984103);
-        let (mut lat, mut lon) = geod.direct(home.x(), home.y(), 30.0, 35.0);
+        println!("azi1: {} degrees", azi1);
+
+        let (mut lat, mut lon) =
+            geod.direct(position_home_drone.x(), position_home_drone.y(), 30.0, 35.0);
         let vtol_transition = geo::Point::new(lat, lon);
 
         plan.add_special_waypoint(
@@ -184,26 +190,12 @@ impl MavLinkPlan {
                 Some(0.0),
                 Some(0.0),
                 Some(direction_take_off),
-                Some(home.x()),
-                Some(home.y()),
+                Some(position_home_drone.x()),
+                Some(position_home_drone.y()),
                 Some(30.0),
             ],
         );
 
-        plan.add_special_waypoint(
-            None,
-            MavCmd::MAV_CMD_CONDITION_YAW,
-            [
-                Some(direction_take_off),
-                Some(22.5),
-                Some(1.0),
-                Some(0.0),
-                None,
-                None,
-                None,
-            ],
-        );
-        
         plan.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
 
         plan.add_special_waypoint(
@@ -220,7 +212,12 @@ impl MavLinkPlan {
             ],
         );
 
-        (lat, lon) = geod.direct(vtol_transition.x(), vtol_transition.y(), direction_take_off, 210.0);
+        (lat, lon) = geod.direct(
+            vtol_transition.x(),
+            vtol_transition.y(),
+            direction_take_off,
+            210.0,
+        );
         let mut current_point = geo::Point::new(lat, lon);
         plan.add_waypoint(60, current_point.x(), current_point.y());
 
@@ -255,10 +252,15 @@ impl MavLinkPlan {
 
         // plan.add_waypoint(80, 52.28381947097879, 6.901992010013913);
 
-        (lat, lon) = geod.direct(vtol_transition.x(), vtol_transition.y(), direction_landing, 210.0);
+        (lat, lon) = geod.direct(
+            vtol_transition.x(),
+            vtol_transition.y(),
+            direction_landing,
+            210.0,
+        );
         current_point = geo::Point::new(lat, lon);
         plan.add_waypoint(60, current_point.x(), current_point.y());
-        
+
         plan.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
 
         plan.add_special_waypoint(
@@ -283,8 +285,8 @@ impl MavLinkPlan {
                 Some(1.0),
                 Some(0.0),
                 None,
-                Some(home.x()),
-                Some(home.y()),
+                Some(position_home_drone.x()),
+                Some(position_home_drone.y()),
                 Some(0.0),
             ],
         );
