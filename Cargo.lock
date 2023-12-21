@@ -812,6 +812,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
+name = "dubins_paths"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2977eada454ea4d2c1c25d5298996a9944178ac99e1d46e29763960e493759b1"
+
+[[package]]
 name = "earcutr"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1138,6 +1144,7 @@ dependencies = [
 name = "generator-mavlink-plan"
 version = "0.1.0"
 dependencies = [
+ "dubins_paths",
  "geo",
  "geo-types",
  "geographiclib-rs",

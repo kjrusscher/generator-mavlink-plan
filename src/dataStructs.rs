@@ -1,11 +1,11 @@
+//! Data structs for the .plan file
 use geo;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
-use serde::Serialize;
-use serde_repr::Serialize_repr;
+use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
-// This enum is also in the mavlink crate. It's there under mavlink::common::MavCmd.
-// Somehow enum to number does not serialize well for mavlink::common::MavComd, so we made our own.
-#[derive(Serialize_repr)]
+/// Enum mavlink::common::MavCmd does not serialize well to a number. This one does serialize correctly.
+#[derive(Serialize_repr, Deserialize_repr)]
 #[repr(u16)]
 pub enum MavCmd {
     MAV_CMD_NAV_WAYPOINT = 16,
@@ -15,45 +15,51 @@ pub enum MavCmd {
     MAV_CMD_DO_VTOL_TRANSITION = 3000,
 }
 
-#[derive(Serialize)]
+/// Used in GeoFenceCirle
+#[derive(Serialize, Deserialize)]
 pub struct Circle {
     pub center: [f64; 2],
     pub radius: f64,
 }
 
-#[derive(Serialize)]
+/// Used in GeoFence
+#[derive(Serialize, Deserialize)]
 pub struct GeoFenceCircle {
     pub circle: Circle,
     pub inclusion: bool,
     pub version: i32,
 }
 
-#[derive(Serialize)]
+/// Used in GeoFence
+#[derive(Serialize, Deserialize)]
 pub struct GeoFencePolygon {
     pub inclusion: bool,
     pub polygon: Vec<[f64; 2]>,
     pub version: i32,
 }
 
-#[derive(Serialize)]
+/// Used in MavLinkPlan
+#[derive(Serialize, Deserialize)]
 pub struct GeoFence {
     pub circles: Vec<GeoFenceCircle>,
     pub polygons: Vec<GeoFencePolygon>,
     pub version: i32,
 }
 
-#[derive(Serialize)]
+/// Used in MavLinkPlan
+#[derive(Serialize, Deserialize)]
 pub struct RallyPoints {
     pub points: Vec<[f64; 3]>,
     pub version: i32,
 }
 
-#[derive(Serialize)]
+/// Used in Mission
+#[derive(Serialize, Deserialize)]
 pub struct MavLinkSimpleItem {
     pub AMSLAltAboveTerrain: Option<i32>,
     pub Altitude: Option<i32>,
     pub AltitudeMode: i32,
-    pub MISSION_ITEM_ID: Option<i32>,
+    pub MISSION_ITEM_ID: Option<String>,
     pub autoContinue: bool,
     pub command: MavCmd,
     pub doJumpId: Option<i32>,
@@ -63,7 +69,8 @@ pub struct MavLinkSimpleItem {
     pub type_name: String,
 }
 
-#[derive(Serialize)]
+/// Used in MavLinkPlan
+#[derive(Serialize, Deserialize)]
 pub struct Mission {
     pub cruiseSpeed: i32,
     pub firmwareType: i32,
@@ -73,7 +80,8 @@ pub struct Mission {
     pub plannedHomePosition: [f64; 3],
 }
 
-#[derive(Serialize)]
+/// Top level item from which .plan is generated
+#[derive(Serialize, Deserialize)]
 pub struct MavLinkPlan {
     pub fileType: String,
     pub geoFence: GeoFence,
@@ -145,21 +153,19 @@ impl Default for MavLinkPlan {
             plannedHomePosition: [52.2825397, 6.8984103, 40.44],
         };
 
-        let plan: MavLinkPlan = MavLinkPlan {
+        MavLinkPlan {
             fileType: String::from("Plan"),
             version: 1,
             geoFence: geo_fence,
             groundStation: String::from("QGroundControl"),
             mission: mission,
             rallyPoints: rally_points,
-        };
-
-        return plan;
+        }
     }
 }
 
 impl MavLinkPlan {
-    pub fn new(wind_direction_10m: i32, wind_direction_80m: i32) -> MavLinkPlan {
+    pub fn new(wind_direction_10m: i32, wind_direction_80m: i32) -> Self {
         let mut plan = MavLinkPlan::default();
         let geod = Geodesic::wgs84();
 
@@ -170,11 +176,16 @@ impl MavLinkPlan {
         } else {
             direction_landing = f64::from(wind_direction_10m) - 180.0;
         }
-        
+
         let position_pilot = geo::Point::new(52.282432, 6.898313);
         let position_home_drone = geo::Point::new(52.282578, 6.898316);
         // Calculate the azimuth from p1 to p2.
-        let (azi1, _, _) = geod.inverse(position_pilot.x(), position_pilot.y(), position_home_drone.x(), position_home_drone.y());
+        let (azi1, _, _) = geod.inverse(
+            position_pilot.x(),
+            position_pilot.y(),
+            position_home_drone.x(),
+            position_home_drone.y(),
+        );
 
         println!("azi1: {} degrees", azi1);
 
@@ -299,7 +310,7 @@ impl MavLinkPlan {
         let id: i32 = (self.mission.items.len() as i32) + 1;
         waypoint.AMSLAltAboveTerrain = Some(height);
         waypoint.Altitude = Some(height);
-        waypoint.MISSION_ITEM_ID = Some(id);
+        waypoint.MISSION_ITEM_ID = Some(id.to_string());
         waypoint.doJumpId = Some(id);
         waypoint.params = [
             Some(0.0),
@@ -324,7 +335,7 @@ impl MavLinkPlan {
         let id: i32 = (self.mission.items.len() as i32) + 1;
         waypoint.AMSLAltAboveTerrain = height;
         waypoint.Altitude = height;
-        waypoint.MISSION_ITEM_ID = Some(id);
+        waypoint.MISSION_ITEM_ID = Some(id.to_string());
         waypoint.command = command;
         waypoint.doJumpId = Some(id);
         waypoint.params = params;

@@ -17,3 +17,42 @@
 | Never exceed airspeed | 35 m/s (126 km/h) |
 
 SkyOps
+
+## A*
+
+Check if start and end position are valid.
+
+Push start position to Open Set
+
+while (not end)
+    Pull top position from Open Set
+    calculate new positions
+
+    Check if new position are in Closed Set
+    Check validity of new positions
+    Check if new positions is end 
+
+    Calculate node information of new position
+
+    Push top position to Closed Set
+    Push new positions to Open Set
+
+
+functions
+- calculate_new_positions(geo::Point, azimuth) -> Vec<geo::Point>
+- is_position_valid(geo::Point) -> bool
+- calculate_h(geo::Point) -> f64 {dubins_path}
+- calculate_g(geo::Point, top_position: geo::Point) -> f64
+
+Vec<geo::Point> can also be array as there are always the same amount of points calculated.
+Does geo::Point include heading/azimuth?
+
+Cost so far (g):
+- Path length
+- Steering difference
+- Total amount of steering
+
+Cost to goal (h):
+- Calculate heading change begin and end
+- Calculate circle begin and end
+- Calculate distance between new points

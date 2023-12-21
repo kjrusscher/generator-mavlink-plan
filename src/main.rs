@@ -1,3 +1,6 @@
+//! Mavlink Path Generator
+
+// pub mod astar_planner;
 pub mod dataStructs;
 
 use iced::widget::{button, column, container, pick_list, row, scrollable, text, vertical_space};
@@ -10,7 +13,8 @@ use std::io::BufWriter;
 
 use crate::dataStructs::*;
 
-#[derive(Debug, Deserialize)]
+/// Wind directions at specific time
+#[derive(Debug, Deserialize, Clone)]
 struct HourlyUnit {
     time: String,
     winddirection_10m: String,
@@ -18,7 +22,8 @@ struct HourlyUnit {
     winddirection_120m: String,
 }
 
-#[derive(Debug, Deserialize)]
+/// Wind directions for range of times
+#[derive(Debug, Deserialize, Clone)]
 struct HourlyData {
     time: Vec<String>,
     winddirection_10m: Vec<i32>,
@@ -26,7 +31,8 @@ struct HourlyData {
     winddirection_120m: Vec<i32>,
 }
 
-#[derive(Debug, Deserialize)]
+/// For reading in weather data from open-meteo
+#[derive(Debug, Deserialize, Clone)]
 struct WeatherData {
     latitude: f64,
     longitude: f64,
@@ -39,6 +45,7 @@ struct WeatherData {
     hourly: HourlyData,
 }
 
+/// Wind data options
 #[derive(Debug, Clone)]
 struct WindData {
     direction_10m: Option<i32>,
@@ -46,14 +53,17 @@ struct WindData {
     direction_120m: Option<i32>,
 }
 
+/// Stores state information for application
 struct MavlinkPlanGenerator {
     plan: Option<MavLinkPlan>,
     weather_data: WeatherData,
+    wind_unit: Option<String>,
     data: HashMap<String, WindData>,
     selected_time: Option<String>,
     wind_data: WindData,
 }
 
+/// Definitions for Iced
 #[derive(Debug, Clone)]
 enum Message {
     OptionSelected(String),
@@ -64,24 +74,36 @@ impl Sandbox for MavlinkPlanGenerator {
     type Message = Message;
 
     fn new() -> MavlinkPlanGenerator {
-        let response = reqwest::blocking::get("https://api.open-meteo.com/v1/forecast?latitude=52.29&longitude=6.9&hourly=winddirection_10m,winddirection_80m,winddirection_120m").unwrap();
-        let weather_info: WeatherData = serde_json::from_reader(response).unwrap();
-
+        let response = reqwest::blocking::get("https://api.open-meteo.com/v1/forecast?latitude=52.29&longitude=6.9&hourly=winddirection_10m,winddirection_80m,winddirection_120m");
         let mut data = HashMap::new();
-        for i in 0..weather_info.hourly.time.len() {
-            let wind_data = WindData {
-                direction_10m: Some(weather_info.hourly.winddirection_10m[i]),
-                direction_80m: Some(weather_info.hourly.winddirection_80m[i]),
-                direction_120m: Some(weather_info.hourly.winddirection_120m[i]),
-            };
+        let mut weather_info: WeatherData;
+        let mut wind_unit = None;
+        match response {
+            Ok(weather_response) => {
+                weather_info = serde_json::from_reader(weather_response).unwrap();
 
-            data.insert(weather_info.hourly.time[i].clone(), wind_data);
+                wind_unit = Some(weather_info.hourly_units.winddirection_10m.clone());
+
+                for i in 0..weather_info.hourly.time.len() {
+                    let wind_data = WindData {
+                        direction_10m: Some(weather_info.hourly.winddirection_10m[i]),
+                        direction_80m: Some(weather_info.hourly.winddirection_80m[i]),
+                        direction_120m: Some(weather_info.hourly.winddirection_120m[i]),
+                    };
+
+                    data.insert(weather_info.hourly.time[i].clone(), wind_data);
+                }
+            }
+            Err(error) => { 
+                panic!("Kon weersinformatie niet ophalen, waarschijnlijk geen internet verbinding.");
+            }
         }
 
         MavlinkPlanGenerator {
             plan: None,
             data: data,
             weather_data: weather_info,
+            wind_unit: wind_unit,
             selected_time: None,
             wind_data: WindData {
                 direction_10m: None,
@@ -116,7 +138,10 @@ impl Sandbox for MavlinkPlanGenerator {
                         .unwrap()
                         .direction_120m,
                 };
-                self.plan = Some(MavLinkPlan::new(self.wind_data.direction_10m.unwrap(), self.wind_data.direction_80m.unwrap()));
+                self.plan = Some(MavLinkPlan::new(
+                    self.wind_data.direction_10m.unwrap(),
+                    self.wind_data.direction_80m.unwrap(),
+                ));
             }
             Message::SavePressed => {
                 if self.selected_time.is_some() {
@@ -151,8 +176,9 @@ impl Sandbox for MavlinkPlanGenerator {
 
         let start_location_text = text(format!("Drone positie:")).size(25);
         let start_location_gps = text(format!(
-            "long: {:.2}, latt: {:.2}", 52.2825397,6.8984103
-            // self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
+            "long: {:.2}, latt: {:.2}",
+            52.2825397,
+            6.8984103 // self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
         ))
         .size(20);
 
@@ -172,22 +198,19 @@ impl Sandbox for MavlinkPlanGenerator {
         let wind_direction_10 = text(format!(
             " 10 meter: {}{}",
             self.wind_data.direction_10m.unwrap_or(0).to_string(),
-            self.weather_data.hourly_units.winddirection_10m.to_string()
+            self.wind_unit.as_ref().unwrap_or(&"°".to_string())
         ))
         .size(20);
         let wind_direction_80 = text(format!(
             " 80 meter: {}{}",
             self.wind_data.direction_80m.unwrap_or(0).to_string(),
-            self.weather_data.hourly_units.winddirection_80m.to_string()
+            self.wind_unit.as_ref().unwrap_or(&"°".to_string())
         ))
         .size(20);
         let wind_direction_120 = text(format!(
             "120 meter: {}{}",
             self.wind_data.direction_120m.unwrap_or(0).to_string(),
-            self.weather_data
-                .hourly_units
-                .winddirection_120m
-                .to_string()
+            self.wind_unit.as_ref().unwrap_or(&"°".to_string())
         ))
         .size(20);
 
@@ -229,5 +252,8 @@ impl Sandbox for MavlinkPlanGenerator {
 }
 
 pub fn main() -> iced::Result {
+    let file = std::fs::read_to_string("Geofence_Fase_1_zonder_exclusion_zone.plan").unwrap();
+    let plan: dataStructs::MavLinkPlan = serde_json::from_str(&file).unwrap();
+    println!("{}:{}: inclusion is {}.",file!(), line!(), plan.geoFence.polygons[0].inclusion);
     MavlinkPlanGenerator::run(Settings::default())
 }
