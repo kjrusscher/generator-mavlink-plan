@@ -1,7 +1,7 @@
 //! Mavlink Path Generator
 
 // pub mod astar_planner;
-pub mod dataStructs;
+pub mod data_structs;
 
 use iced::widget::{button, column, container, pick_list, row, scrollable, text, vertical_space};
 use iced::{Alignment, Element, Length, Sandbox, Settings};
@@ -11,10 +11,11 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
 
-use crate::dataStructs::*;
+use crate::data_structs::*;
 
 /// Wind directions at specific time
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)] // Field are read from json, but not used.
 struct HourlyUnit {
     time: String,
     winddirection_10m: String,
@@ -33,6 +34,7 @@ struct HourlyData {
 
 /// For reading in weather data from open-meteo
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)] // Field are read from json, but not used.
 struct WeatherData {
     latitude: f64,
     longitude: f64,
@@ -95,7 +97,7 @@ impl Sandbox for MavlinkPlanGenerator {
                 }
             }
             Err(error) => { 
-                panic!("Kon weersinformatie niet ophalen, waarschijnlijk geen internet verbinding.");
+                panic!("Kon weersinformatie niet ophalen, waarschijnlijk geen internet verbinding. {}", error);
             }
         }
 
@@ -253,7 +255,7 @@ impl Sandbox for MavlinkPlanGenerator {
 
 pub fn main() -> iced::Result {
     let file = std::fs::read_to_string("Geofence_Fase_1_zonder_exclusion_zone.plan").unwrap();
-    let plan: dataStructs::MavLinkPlan = serde_json::from_str(&file).unwrap();
+    let plan: data_structs::MavLinkPlan = serde_json::from_str(&file).unwrap();
     println!("{}:{}: inclusion is {}.",file!(), line!(), plan.geoFence.polygons[0].inclusion);
     MavlinkPlanGenerator::run(Settings::default())
 }

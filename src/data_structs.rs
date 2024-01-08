@@ -7,6 +7,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 /// Enum mavlink::common::MavCmd does not serialize well to a number. This one does serialize correctly.
 #[derive(Serialize_repr, Deserialize_repr)]
 #[repr(u16)]
+#[allow(non_camel_case_types)]
 pub enum MavCmd {
     MAV_CMD_NAV_WAYPOINT = 16,
     MAV_CMD_NAV_LAND = 21,
@@ -55,7 +56,8 @@ pub struct RallyPoints {
 
 /// Used in Mission
 #[derive(Serialize, Deserialize)]
-pub struct MavLinkSimpleItem {
+#[allow(non_snake_case)]
+pub struct MavLinkSimpleItem{
     pub AMSLAltAboveTerrain: Option<i32>,
     pub Altitude: Option<i32>,
     pub AltitudeMode: i32,
@@ -71,6 +73,7 @@ pub struct MavLinkSimpleItem {
 
 /// Used in MavLinkPlan
 #[derive(Serialize, Deserialize)]
+#[allow(non_snake_case)]
 pub struct Mission {
     pub cruiseSpeed: i32,
     pub firmwareType: i32,
@@ -82,6 +85,7 @@ pub struct Mission {
 
 /// Top level item from which .plan is generated
 #[derive(Serialize, Deserialize)]
+#[allow(non_snake_case)]
 pub struct MavLinkPlan {
     pub fileType: String,
     pub geoFence: GeoFence,
@@ -91,9 +95,9 @@ pub struct MavLinkPlan {
     pub version: u8,
 }
 
-impl Default for MavLinkSimpleItem {
+impl Default for MavLinkSimpleItem{
     fn default() -> Self {
-        let item = MavLinkSimpleItem {
+        let item = MavLinkSimpleItem{
             AMSLAltAboveTerrain: Some(120),
             Altitude: Some(120),
             AltitudeMode: 1,
@@ -165,7 +169,7 @@ impl Default for MavLinkPlan {
 }
 
 impl MavLinkPlan {
-    pub fn new(wind_direction_10m: i32, wind_direction_80m: i32) -> Self {
+    pub fn new(wind_direction_10m: i32, _wind_direction_80m: i32) -> Self {
         let mut plan = MavLinkPlan::default();
         let geod = Geodesic::wgs84();
 
@@ -176,17 +180,18 @@ impl MavLinkPlan {
         } else {
             direction_landing = f64::from(wind_direction_10m) - 180.0;
         }
-
+        
         let position_pilot = geo::Point::new(52.282432, 6.898313);
         let position_home_drone = geo::Point::new(52.282578, 6.898316);
         // Calculate the azimuth from p1 to p2.
-        let (azi1, _, _) = geod.inverse(
+        let (distance, azi1, _, _) = geod.inverse(
             position_pilot.x(),
             position_pilot.y(),
             position_home_drone.x(),
             position_home_drone.y(),
         );
 
+        println!("distance: {} meters", distance);
         println!("azi1: {} degrees", azi1);
 
         let (mut lat, mut lon) =
