@@ -6,7 +6,6 @@
 //      a node has already been processed.
 
 /// A* Planner code
-
 use geo;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
@@ -94,11 +93,11 @@ impl AStarPlanner {
 
                 let node = Node {
                     pose: pose,
-                    traveled_distance: parent.traveled_distance + 200,    // Make distance between point the same
-                    steering: pose.heading - parent.heading,              // heading - heading parent
-                    steeringIntegral: (pose.heading - parent.heading).abs(),      // sum(|steering|)
-                    g: cost_so_far,                     // cost so far
-                    h: cost_to_goal,                     // cost to goal
+                    traveled_distance: parent.traveled_distance + 200, // Make distance between point the same
+                    steering: pose.heading - parent.heading,           // heading - heading parent
+                    steeringIntegral: (pose.heading - parent.heading).abs(), // sum(|steering|)
+                    g: cost_so_far,                                    // cost so far
+                    h: cost_to_goal,                                   // cost to goal
                     f: cost_so_far + cost_to_goal,                     // total cost g+h
                     parent: Some(Rc::clone(&parent)),
                 };
@@ -114,27 +113,60 @@ impl AStarPlanner {
 
 fn calculate_next_poses(pose: &GeospatialPose) -> Vec<GeospatialPose> {
     let mut next_poses = Vec::new();
+    let g = Geodesic::wgs84();
+    // Convert from wind direction system to mathematical system.
+    let adjusted_degrees = pose.heading - 90.0;
+    let heading_radian = adjusted_degrees * (std::f64::consts::PI / 180.0);
+    
     // 250 meters straight ahead
-    // y = cos(heading) * 225.0
-    // x = sin(heading) * 225.0
-    // heading = heading
+    let (lat,lon,_) = g.direct(pose.position.x, pose.position.y, pose.heading, 250);
+    let point_straight_ahead = geo::Point::new(lat, lon);
+    let pose_straight_ahead = GeospatialPose {
+        position: point_straight_ahead,
+        heading: pose.heading,
+        height: 120,
+    };
+    next_poses.push(pose_straight_ahead);
+
     // sharp left turn
-    // y = -sin(heading) * -145.0 + cos(heading) * -145.0
-    // x =  cos(heading) * 145.0 + sin(heading) *  145.0
-    // if heading > 90 {
-    //     heading = heading - 90.0;
-    // } else {
-    //     heading = heading + 270.0;
-    // }
+    let x_increment = 145;
+    let y_increment = 145;
+    let point_sharp_left = geo::Point::new(
+        pose.position.x + x_increment * heading_radian.cos() - y_increment * heading_radian.sin(),
+        pose.position.y + x_increment * heading_radian.sin() + y_increment * heading_radian.cos(),
+    );
+    let heading_sharp_left = if pose.heading > 90 {
+        heading - 90.0
+    } else {
+        heading + 270.0
+    };
+    let pose_sharp_left = GeospatialPose {
+        position: point_sharp_left,
+        heading: heading_sharp_left,
+        height: 120,
+    };
+    next_poses.push(pose_sharp_left);
+
     // sharp right turn
-    // y = -sin(heading) * 145.0 + cos(heading) * 145.0
-    // x =  cos(heading) * 145.0 + sin(heading) * 145.0
-    // if heading < 270.0 {
-    //     heading = heading + 90.0;
-    // } else {
-    //     heading = heading - 270.0;
-    // }
-    return next_poses
+    let x_increment = 145;
+    let y_increment = 145;
+    let point_sharp_right = geo::Point::new(
+        pose.position.x + x_increment * heading_radian.cos() - y_increment * heading_radian.sin(),
+        pose.position.y + x_increment * heading_radian.sin() + y_increment * heading_radian.cos(),
+    );
+    let heading_sharp_right = if pose.heading < 270 {
+        heading + 90.0
+    } else {
+        heading - 270.0
+    };
+    let pose_sharp_right = GeospatialPose {
+        position: point_sharp_right,
+        heading: heading_sharp_right,
+        height: 120,
+    };
+    next_poses.push(pose_sharp_right);
+
+    return next_poses;
 }
 
 /// Calculate cost so far
@@ -145,4 +177,25 @@ fn calculate_g(child_pose: &GeospatialPose, parent_pose: &GeospatialPose) -> f64
 /// Calculate cost to goal
 fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
     1.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_next_poses() {
+
+        let initial_pose = GeospatialPose{
+            position: geo::Point::new(60.0,5.0),
+            heading: 90.0,
+            height: 120.0
+        };
+
+        // Exercise
+        let next_poses = calculate_next_poses(&initial_pose);
+
+        assert!
+
+    }
 }
