@@ -1,6 +1,6 @@
 //! Mavlink Path Generator
 
-// pub mod astar_planner;
+pub mod astar_planner;
 pub mod data_structs;
 
 use iced::widget::{button, column, container, pick_list, row, scrollable, text, vertical_space};

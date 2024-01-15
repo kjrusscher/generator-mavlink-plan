@@ -5,29 +5,23 @@ use std::rc::Rc;
 
 use geo;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct GeospatialPose {
-    position: geo::Point,
-    heading: f64, // heading at this point
-    height: f64,
+    pub position: geo::geometry::Point,
+    pub heading: f64, // heading at this point
+    pub height: f64,
 }
 
 #[derive(Clone, Debug)]
 pub struct Node {
-    pose: GeospatialPose,
-    traveled_distance: f64,    // Make distance between point the same
-    steering: f64,              // heading - heading parent
-    steeringIntegral: f64,      // sum(|steering|)
-    f: f64,                     // total cost g+h
-    g: f64,                     // cost so far
-    h: f64,                     // cost to goal
-    parent: Option<Rc<Node>>,
-}
-
-impl GeospatialPose {
-    pub fn is_valid() -> bool {
-        true
-    }
+    pub pose: GeospatialPose,
+    pub traveled_distance: f64,    // Make distance between point the same
+    pub steering: f64,              // heading - heading parent
+    pub steering_integral: f64,      // sum(|steering|)
+    pub f: f64,                     // total cost g+h
+    pub g: f64,                     // cost so far
+    pub h: f64,                     // cost to goal
+    pub parent: Option<Rc<Node>>,
 }
 
 // =begin=========== Code for BinaryHeap and HashSet ==================begin=
@@ -47,17 +41,17 @@ fn round_heading(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
 }
 
+impl Eq for Node {}
+
 impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
         self.f == other.f
     }
 }
 
-impl Eq for Node {}
-
 impl Ord for Node {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.f.cmp(&self.f) // reverse order
+        other.f.partial_cmp(&self.f).unwrap_or(Ordering::Equal)
     }
 }
 
@@ -67,11 +61,22 @@ impl PartialOrd for Node {
     }
 }
 
-impl Hash for Node {
+impl Eq for GeospatialPose {}
+
+impl PartialEq for GeospatialPose {
+    fn eq(&self, other: &Self) -> bool {
+        round_point(self.position.x()) == round_point(other.position.x()) &&
+        round_point(self.position.y()) == round_point(other.position.y()) &&
+        round_height(self.height) == round_height(other.height) &&
+        round_heading(self.heading) == round_heading(other.heading)
+    }
+}
+
+impl Hash for GeospatialPose {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        geo::Point::new(round_point(self.pose.position.x), round_point(self.pose.position.y)).hash(state);
-        round_height(self.pose.height).to_bits().hash(state);
-        round_heading(self.pose.heading).to_bits().hash(state); // Convert to_bits for stable hashing of floats
+        geo::Point::new(round_point(self.position.x()).to_bits(), round_point(self.position.y()).to_bits()).hash(state);
+        round_height(self.height).to_bits().hash(state);
+        round_heading(self.heading).to_bits().hash(state); // Convert to_bits for stable hashing of floats
     }
 }
 

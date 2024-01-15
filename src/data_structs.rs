@@ -1,6 +1,6 @@
 //! Data structs for the .plan file
 use geo;
-use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
+use geographiclib_rs::{DirectGeodesic, Geodesic};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
