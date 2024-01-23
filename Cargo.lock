@@ -813,9 +813,9 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
 name = "dubins_paths"
-version = "2.0.1"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2977eada454ea4d2c1c25d5298996a9944178ac99e1d46e29763960e493759b1"
+checksum = "dd74dd9803b4142487415760722b3093f344e6e6887883f2fa4fb6e0ce55d870"
 
 [[package]]
 name = "earcutr"

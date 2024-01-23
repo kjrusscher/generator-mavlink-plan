@@ -1,17 +1,20 @@
 //! Mavlink Path Generator
 
 pub mod astar_planner;
-pub mod data_structs;
+pub mod mav_link_plan;
 
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, vertical_space};
+use iced::widget::{
+    button, column, container, pick_list, row, scrollable, text, vertical_space, Button, Text,
+};
 use iced::{Alignment, Element, Length, Sandbox, Settings};
 use notify_rust::Notification;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
+use std::time::Instant;
 
-use crate::data_structs::*;
+use crate::mav_link_plan::*;
 
 /// Wind directions at specific time
 #[derive(Debug, Deserialize, Clone)]
@@ -70,6 +73,7 @@ struct MavlinkPlanGenerator {
 enum Message {
     OptionSelected(String),
     SavePressed,
+    AStarTest,
 }
 
 impl Sandbox for MavlinkPlanGenerator {
@@ -96,8 +100,11 @@ impl Sandbox for MavlinkPlanGenerator {
                     data.insert(weather_info.hourly.time[i].clone(), wind_data);
                 }
             }
-            Err(error) => { 
-                panic!("Kon weersinformatie niet ophalen, waarschijnlijk geen internet verbinding. {}", error);
+            Err(error) => {
+                panic!(
+                    "Kon weersinformatie niet ophalen, waarschijnlijk geen internet verbinding. {}",
+                    error
+                );
             }
         }
 
@@ -165,6 +172,17 @@ impl Sandbox for MavlinkPlanGenerator {
                         .unwrap();
                 }
             }
+            Message::AStarTest => {
+                println!("AStar pressed");
+                let start_position = geo::Point::new(52.2825397, 6.8984103);
+                let start_heading = 90.0;
+                let goal_position = geo::Point::new(53.3825397, 7.9984103);
+                let mut test_a_star_planner = astar_planner::AStarPlanner::new(start_position, start_heading, goal_position).unwrap();
+                let start = Instant::now();
+                let _test_planning = test_a_star_planner.calculate_path();
+                let duration = start.elapsed();
+                println!("Route geplanned in {:?} seconden.", duration);
+            }
         }
     }
 
@@ -176,11 +194,13 @@ impl Sandbox for MavlinkPlanGenerator {
         )
         .placeholder("Kies een tijd...");
 
+        let start_position = geo::Point::new(52.2825397, 6.8984103);
+
         let start_location_text = text(format!("Drone positie:")).size(25);
         let start_location_gps = text(format!(
             "long: {:.2}, latt: {:.2}",
-            52.2825397,
-            6.8984103 // self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
+            start_position.x(),
+            start_position.y() // self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
         ))
         .size(20);
 
@@ -228,12 +248,16 @@ impl Sandbox for MavlinkPlanGenerator {
         .align_items(Alignment::Center)
         .spacing(10);
 
-        let button = button("Opslaan").on_press(Message::SavePressed);
+        // let button = button("Opslaan").on_press(Message::SavePressed);
+        // Create the button
+        let button = Button::new("Opslaan").on_press(Message::SavePressed);
+        let button_astar_test = Button::new("A* planner").on_press((Message::AStarTest));
 
         let right_column = column![
             vertical_space(60),
             text(format!("Vluchtplan")).size(25),
             button,
+            button_astar_test,
             vertical_space(600)
         ]
         .width(Length::Fill)
@@ -255,7 +279,12 @@ impl Sandbox for MavlinkPlanGenerator {
 
 pub fn main() -> iced::Result {
     let file = std::fs::read_to_string("Geofence_Fase_1_zonder_exclusion_zone.plan").unwrap();
-    let plan: data_structs::MavLinkPlan = serde_json::from_str(&file).unwrap();
-    println!("{}:{}: inclusion is {}.",file!(), line!(), plan.geoFence.polygons[0].inclusion);
+    let plan: mav_link_plan::MavLinkPlan = serde_json::from_str(&file).unwrap();
+    println!(
+        "{}:{}: inclusion is {}.",
+        file!(),
+        line!(),
+        plan.geoFence.polygons[0].inclusion
+    );
     MavlinkPlanGenerator::run(Settings::default())
 }

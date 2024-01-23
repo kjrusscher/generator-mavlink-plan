@@ -7,8 +7,8 @@ use geo;
 
 #[derive(Clone, Debug, Copy)]
 pub struct GeospatialPose {
-    pub position: geo::geometry::Point,
-    pub heading: f64, // heading at this point
+    pub position: geo::Point,
+    pub heading: f64,
     pub height: f64,
 }
 
@@ -51,7 +51,7 @@ impl PartialEq for Node {
 
 impl Ord for Node {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.f.partial_cmp(&self.f).unwrap_or(Ordering::Equal)
+        self.f.partial_cmp(&other.f).unwrap_or(Ordering::Equal)
     }
 }
 

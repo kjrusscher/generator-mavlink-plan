@@ -17,4 +17,4 @@ geo = "0.26"
 geo-types = { version = "0.7", features = ["serde"]}
 proj = "0.27"
 geographiclib-rs = "0.2"
-dubins_paths = "2.0"
+dubins_paths = "2.1"
