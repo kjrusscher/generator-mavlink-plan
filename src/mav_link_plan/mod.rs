@@ -215,7 +215,10 @@ impl MavLinkPlan {
 
         for point in path.iter() {
             plan.add_waypoint(120, point.x(), point.y());
+            println!("x {} | y {}", point.x(), point.y());
         }
+
+        plan.add_waypoint(120, 52.28838126, 6.8706142);
         // for point in path.iter().rev() {
         //     plan.add_waypoint(120, point.x(), point.y());
         // }
@@ -242,33 +245,33 @@ impl MavLinkPlan {
             ],
         );
 
-        let (mut lat, mut lon) =
-            geod.direct(home_position_drone.x(), home_position_drone.y(), 30.0, 35.0);
-        let vtol_transition = geo::Point::new(lat, lon);
-        self.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
+        // let (mut lat, mut lon) =
+        //     geod.direct(home_position_drone.x(), home_position_drone.y(), 30.0, 35.0);
+        // let vtol_transition = geo::Point::new(lat, lon);
+        // self.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
 
-        self.add_special_waypoint(
-            None,
-            MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
-            [
-                Some(4.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-            ],
-        );
+        // self.add_special_waypoint(
+        //     None,
+        //     MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
+        //     [
+        //         Some(4.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //         Some(0.0),
+        //     ],
+        // );
 
-        (lat, lon) = geod.direct(
-            vtol_transition.x(),
-            vtol_transition.y(),
-            direction_take_off,
-            210.0,
-        );
-        let current_point = geo::Point::new(lat, lon);
-        self.add_waypoint(60, current_point.x(), current_point.y());
+        // (lat, lon) = geod.direct(
+        //     vtol_transition.x(),
+        //     vtol_transition.y(),
+        //     direction_take_off,
+        //     210.0,
+        // );
+        // let current_point = geo::Point::new(lat, lon);
+        // self.add_waypoint(60, current_point.x(), current_point.y());
     }
 
     fn add_landing_sequence(&mut self, direction_take_off: f64, home_position_drone: geo::Point) {

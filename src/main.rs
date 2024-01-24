@@ -189,6 +189,7 @@ impl Sandbox for MavlinkPlanGenerator {
                 test_a_star_planner.calculate_path();
                 let duration = start.elapsed();
                 self.optimal_path = test_a_star_planner.get_optimal_path();
+                // self.optimal_path = test_a_star_planner.get_all_points();
                 println!("Route geplanned in {:?} seconden.", duration);
             }
         }

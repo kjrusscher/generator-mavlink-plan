@@ -6,6 +6,9 @@
 //      a node has already been processed.
 
 //! A* path planner
+
+use crate::mav_link_plan;
+
 use dubins_paths::{DubinsPath, PosRot, Result as DubinsResult};
 use geo;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
@@ -23,6 +26,7 @@ pub struct AStarPlanner {
     closed_set: HashMap<GeospatialPose, Rc<Node>>,
     goal_pose: GeospatialPose,
     optimal_path: Vec<Rc<Node>>,
+    geofence_lines: Vec<geo::LineString>,
 }
 
 impl AStarPlanner {
@@ -54,6 +58,7 @@ impl AStarPlanner {
             closed_set: HashMap::new(),
             goal_pose: goal_pose,
             optimal_path: Vec::new(),
+            geofence_lines: Vec::new(),
         };
 
         let cost_to_goal = calculate_h(&start_pose, &goal_pose);
@@ -81,6 +86,7 @@ impl AStarPlanner {
         let distance_increment = 250.0;
 
         let mut path_not_found: bool = true;
+        let mut point_in_reach_of_goal: BinaryHeap<Rc<Node>> = BinaryHeap::new();
         while path_not_found {
             // Pull top position from Open Set
             let parent = self.open_set.pop().unwrap();
@@ -120,29 +126,27 @@ impl AStarPlanner {
                 if distance < distance_increment {
                     path_not_found = false;
                     println!("Goal pose is reached");
-                    self.optimal_path.push(Rc::clone(&node));
+                    // self.optimal_path.push(Rc::clone(&node));
+                    point_in_reach_of_goal.push(Rc::clone(&node));
                     self.closed_set.insert(node.pose, node);
-                    break;
+                    // break;
                 } else {
                     // Push new positions to Open Set
                     self.open_set.push(node);
                 }
             }
-
+            
             // Push top position to Closed Set
             self.closed_set.insert(parent.pose, parent);
         }
+        self.optimal_path.push(Rc::clone(&point_in_reach_of_goal.pop().unwrap()));
 
         // Fill the vector with waypoints from goal pose to start pose.
-        let mut pose = self.optimal_path[0].pose;
         loop {
-            let node = self.closed_set.get(&pose).unwrap();
-            self.optimal_path.push(Rc::clone(node));
-
-            if let Some(value) = &node.parent {
-                pose = value.pose;
-            } else {
-                break;
+            let node = self.closed_set.get(&self.optimal_path[self.optimal_path.len()-1].pose).unwrap();
+            match &node.parent {
+                Some(value) => self.optimal_path.push(Rc::clone(&value)),
+                None => break,
             }
         }
     }
@@ -177,6 +181,16 @@ impl AStarPlanner {
 
         return all_points;
     }
+
+    // pub fn fill_geofence(&self, geo_fence: &mav_link_plan::GeoFence) {
+    //     for geo_fence_polygon in geo_fence.polygons.iter() {
+    //         let p_last = geo_fence_polygon.polygon[geo_fence_polygon.polygon.len() - 1];
+    //         for test in geo_fence_polygon.polygon.iter() {
+
+    //             self.geofence_lines.push(lin)
+    //         }
+    //     }
+    // }
 }
 
 impl GeospatialPose {
@@ -184,15 +198,19 @@ impl GeospatialPose {
         let mut next_poses = Vec::new();
 
         // turn 90 degree left
-        next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
+        // next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
         // turn 45 degree left
         next_poses.push(self.calculate_next_pose(-45.0, distance_increment));
+        // turn 22.5 degree left
+        next_poses.push(self.calculate_next_pose(-22.5, distance_increment));
         // straight ahead
         next_poses.push(self.calculate_next_pose(0.0, distance_increment));
+        // turn 22.5 degrees right
+        next_poses.push(self.calculate_next_pose(22.5, distance_increment));
         // turn 45 degrees right
         next_poses.push(self.calculate_next_pose(45.0, distance_increment));
         // turn 90 degrees right
-        next_poses.push(self.calculate_next_pose(90.0, distance_increment));
+        // next_poses.push(self.calculate_next_pose(90.0, distance_increment));
 
         return next_poses;
     }
@@ -226,6 +244,7 @@ impl GeospatialPose {
                 chord_length,
             );
             let point_left_90 = geo::Point::new(lat, lon);
+            println!("new heading {}", new_heading);
             GeospatialPose {
                 position: point_left_90,
                 heading: new_heading,
@@ -236,14 +255,21 @@ impl GeospatialPose {
 
     /// Calculates new heading and put it in 0-360 range.
     fn calculate_new_heading(&self, angle: f64) -> f64 {
-        let new_heading = self.heading + angle;
+        let mut new_heading = self.heading + angle;
         if new_heading < 0.0 {
-            new_heading + 360.0
+            new_heading += 360.0;
         } else if new_heading >= 360.0 {
-            new_heading - 360.0
-        } else {
-            new_heading
+            new_heading -= 360.0;
+            // } else {
+            // new_heading;
         }
+
+        println!(
+            "heading {} | new heading {} | angle {}",
+            self.heading, new_heading, angle
+        );
+
+        return new_heading;
     }
 
     fn is_valid(&self) -> bool {
@@ -283,14 +309,12 @@ fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
     let (lat1, lon1) = (pose.position.x(), pose.position.y()); // Start position
     let (lat2, lon2) = (goal_pose.position.x(), goal_pose.position.y()); // Goal Position
     let (s12, az1, _, _) = geod.inverse(lat1, lon1, lat2, lon2);
-    
-    let mut new_heading = pose.heading - az1;
-    if new_heading < 0.0 {
-        new_heading += 360.0;
-    } else if new_heading > 360.0 {
-        new_heading -= 360.0;
+
+    let mut new_heading = (pose.heading - az1).abs();
+    if new_heading > 180.0 {
+        new_heading = 360.0 - new_heading;
     }
-    let new_heading_rad = new_heading * PI / 360.0;
+    let new_heading_rad = new_heading * 2.0 * PI / 360.0;
 
     let start_position: PosRot = PosRot::from_f32(0.0, 0.0, new_heading_rad as f32);
     let goal_position: PosRot = PosRot::from_f32(s12 as f32, 0.0, 0.0);
