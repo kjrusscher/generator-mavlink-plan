@@ -66,6 +66,7 @@ struct MavlinkPlanGenerator {
     data: HashMap<String, WindData>,
     selected_time: Option<String>,
     wind_data: WindData,
+    optimal_path: Vec<geo::Point>,
 }
 
 /// Definitions for Iced
@@ -119,6 +120,7 @@ impl Sandbox for MavlinkPlanGenerator {
                 direction_80m: None,
                 direction_120m: None,
             },
+            optimal_path: Vec::new(),
         }
     }
 
@@ -149,7 +151,7 @@ impl Sandbox for MavlinkPlanGenerator {
                 };
                 self.plan = Some(MavLinkPlan::new(
                     self.wind_data.direction_10m.unwrap(),
-                    self.wind_data.direction_80m.unwrap(),
+                    &self.optimal_path,
                 ));
             }
             Message::SavePressed => {
@@ -175,12 +177,18 @@ impl Sandbox for MavlinkPlanGenerator {
             Message::AStarTest => {
                 println!("AStar pressed");
                 let start_position = geo::Point::new(52.2825397, 6.8984103);
-                let start_heading = 90.0;
-                let goal_position = geo::Point::new(53.3825397, 7.9984103);
-                let mut test_a_star_planner = astar_planner::AStarPlanner::new(start_position, start_heading, goal_position).unwrap();
+                let start_heading = 80.0;
+                // goal ver weg
+                // let goal_position = geo::Point::new(52.3825397, 6.9984103);
+                // let goal_position = geo::Point::new(52.28458212,6.86716039);
+                let goal_position = geo::Point::new(52.28838126, 6.8706142);
+                let mut test_a_star_planner =
+                    astar_planner::AStarPlanner::new(start_position, start_heading, goal_position)
+                        .unwrap();
                 let start = Instant::now();
-                let _test_planning = test_a_star_planner.calculate_path();
+                test_a_star_planner.calculate_path();
                 let duration = start.elapsed();
+                self.optimal_path = test_a_star_planner.get_optimal_path();
                 println!("Route geplanned in {:?} seconden.", duration);
             }
         }

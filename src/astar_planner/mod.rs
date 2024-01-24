@@ -11,7 +11,7 @@ use geo;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
-use std::f64::consts::PI as PI;
+use std::f64::consts::PI;
 use std::rc::Rc;
 
 mod planning_waypoints;
@@ -65,7 +65,7 @@ impl AStarPlanner {
             steering_integral: 0.0,
             g: 0.0,
             h: cost_to_goal,
-            f: cost_to_goal,
+            f: cost_to_goal + 0.0,
             parent: None,
         });
 
@@ -76,8 +76,9 @@ impl AStarPlanner {
 
     pub fn calculate_path(&mut self) {
         self.optimal_path.clear();
+        let geod = Geodesic::wgs84();
 
-        let distance_increment = 300.0;
+        let distance_increment = 250.0;
 
         let mut path_not_found: bool = true;
         while path_not_found {
@@ -95,7 +96,7 @@ impl AStarPlanner {
                 let steering = pose.heading - parent.pose.heading;
                 let steering_integral = parent.steering_integral + steering.abs();
 
-                let cost_so_far = calculate_g(&pose, &parent, distance_increment); // distance plus steering plus diff steering
+                let cost_so_far = calculate_g(&pose, &parent, distance_increment);
                 let cost_to_goal = calculate_h(&pose, &self.goal_pose);
 
                 let node = Rc::new(Node {
@@ -110,7 +111,13 @@ impl AStarPlanner {
                 });
 
                 // Check if new positions is goal
-                if pose == &self.goal_pose {
+                let (distance, _, _, _) = geod.inverse(
+                    pose.position.x(),
+                    pose.position.y(),
+                    self.goal_pose.position.x(),
+                    self.goal_pose.position.y(),
+                );
+                if distance < distance_increment {
                     path_not_found = false;
                     println!("Goal pose is reached");
                     self.optimal_path.push(Rc::clone(&node));
@@ -139,77 +146,100 @@ impl AStarPlanner {
             }
         }
     }
+
+    pub fn get_optimal_path(&self) -> Vec<geo::Point> {
+        let mut optimal_path: Vec<geo::Point> = Vec::new();
+
+        for point in self.optimal_path.iter().rev() {
+            optimal_path.push(point.pose.position);
+        }
+
+        println!(
+            "# waypoints: {} | # closed set {} | # open set {}",
+            optimal_path.len(),
+            self.closed_set.len(),
+            self.open_set.len()
+        );
+
+        return optimal_path;
+    }
+
+    pub fn get_all_points(&self) -> Vec<geo::Point> {
+        let mut all_points: Vec<geo::Point> = Vec::new();
+
+        for node in self.closed_set.values() {
+            all_points.push(node.pose.position);
+        }
+
+        for node in self.open_set.iter() {
+            all_points.push(node.pose.position);
+        }
+
+        return all_points;
+    }
 }
 
 impl GeospatialPose {
-    fn calculate_next_poses(&self, distance_travelled: f64) -> Vec<GeospatialPose> {
+    fn calculate_next_poses(&self, distance_increment: f64) -> Vec<GeospatialPose> {
         let mut next_poses = Vec::new();
-        let g = Geodesic::wgs84();
-
-        let heading_left_90 = self.calculate_new_heading(-90.0);
-        let heading_left_45 = self.calculate_new_heading(-45.0);
-        let heading_right_45 = self.calculate_new_heading(45.0);
-        let heading_right_90 = self.calculate_new_heading(90.0);
-        let _chord_length_45 = chord_length(distance_travelled, 45.0);
-        let chord_length_90 = chord_length(distance_travelled, 90.0);
-
-        // 250 meters straight ahead
-        let (mut lat, mut lon, _) = g.direct(
-            self.position.x(),
-            self.position.y(),
-            self.heading,
-            distance_travelled,
-        );
-        let point_straight_ahead = geo::Point::new(lat, lon);
-        let pose_straight_ahead = GeospatialPose {
-            position: point_straight_ahead,
-            heading: self.heading,
-            height: 120.0,
-        };
-        next_poses.push(pose_straight_ahead);
 
         // turn 90 degree left
-        (lat, lon, _) = g.direct(
-            self.position.x(),
-            self.position.y(),
-            heading_left_45,
-            chord_length_90,
-        );
-        let point_left_90 = geo::Point::new(lat, lon);
-        let pose_left_90 = GeospatialPose {
-            position: point_left_90,
-            heading: heading_left_90,
-            height: 120.0,
-        };
-        next_poses.push(pose_left_90);
-
+        next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
+        // turn 45 degree left
+        next_poses.push(self.calculate_next_pose(-45.0, distance_increment));
+        // straight ahead
+        next_poses.push(self.calculate_next_pose(0.0, distance_increment));
+        // turn 45 degrees right
+        next_poses.push(self.calculate_next_pose(45.0, distance_increment));
         // turn 90 degrees right
-        (lat, lon, _) = g.direct(
-            self.position.x(),
-            self.position.y(),
-            heading_right_45,
-            chord_length_90,
-        );
-        let point_right_90 = geo::Point::new(lat, lon);
-        let pose_right_90 = GeospatialPose {
-            position: point_right_90,
-            heading: heading_right_90,
-            height: 120.0,
-        };
-        next_poses.push(pose_right_90);
+        next_poses.push(self.calculate_next_pose(90.0, distance_increment));
 
         return next_poses;
     }
 
+    fn calculate_next_pose(&self, delta_heading: f64, distance_increment: f64) -> Self {
+        let geod = Geodesic::wgs84();
+
+        if delta_heading == 0.0 {
+            let (lat, lon, _) = geod.direct(
+                self.position.x(),
+                self.position.y(),
+                self.heading,
+                distance_increment,
+            );
+            let point_straight_ahead = geo::Point::new(lat, lon);
+            GeospatialPose {
+                position: point_straight_ahead,
+                heading: self.heading,
+                height: 120.0,
+            }
+        } else {
+            let delta_movement_direction = delta_heading / 2.0;
+
+            let new_heading = self.calculate_new_heading(delta_heading);
+            let movement_direction = self.calculate_new_heading(delta_movement_direction);
+            let chord_length = chord_length(distance_increment, delta_heading);
+            let (lat, lon, _) = geod.direct(
+                self.position.x(),
+                self.position.y(),
+                movement_direction,
+                chord_length,
+            );
+            let point_left_90 = geo::Point::new(lat, lon);
+            GeospatialPose {
+                position: point_left_90,
+                heading: new_heading,
+                height: 120.0,
+            }
+        }
+    }
+
     /// Calculates new heading and put it in 0-360 range.
     fn calculate_new_heading(&self, angle: f64) -> f64 {
-        if angle < -360.0 || angle > 360.0 {
-            panic!("Angle is outside 0.0-360.0 range. Indicates error in code")
-        }
         let new_heading = self.heading + angle;
         if new_heading < 0.0 {
             new_heading + 360.0
-        } else if new_heading > 360.0 {
+        } else if new_heading >= 360.0 {
             new_heading - 360.0
         } else {
             new_heading
@@ -249,48 +279,23 @@ fn calculate_g(child_pose: &GeospatialPose, parent_node: &Node, distance_increme
 
 /// Calculate cost to goal
 fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
-    let g = Geodesic::wgs84();
+    let geod = Geodesic::wgs84();
     let (lat1, lon1) = (pose.position.x(), pose.position.y()); // Start position
     let (lat2, lon2) = (goal_pose.position.x(), goal_pose.position.y()); // Goal Position
-    let (_, d_m, az1, _) = g.inverse(lat1, lon1, lat2, lon2);
-
+    let (s12, az1, _, _) = geod.inverse(lat1, lon1, lat2, lon2);
+    
     let mut new_heading = pose.heading - az1;
     if new_heading < 0.0 {
         new_heading += 360.0;
     } else if new_heading > 360.0 {
         new_heading -= 360.0;
     }
-    let new_heading_rad = new_heading * PI / 360.0; 
+    let new_heading_rad = new_heading * PI / 360.0;
 
     let start_position: PosRot = PosRot::from_f32(0.0, 0.0, new_heading_rad as f32);
-    let goal_position: PosRot = PosRot::from_f32(d_m as f32, 0.0, 0.0);
-    let shortest_path_possible = DubinsPath::shortest_from(
-        start_position,
-        goal_position,
-        140.0,
-    )
-    .unwrap();
+    let goal_position: PosRot = PosRot::from_f32(s12 as f32, 0.0, 0.0);
+    let shortest_path_possible =
+        DubinsPath::shortest_from(start_position, goal_position, 140.0).unwrap();
 
     shortest_path_possible.length() as f64
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn test_calculate_next_poses() {
-
-//         let initial_pose = GeospatialPose{
-//             position: geo::Point::new(60.0,5.0),
-//             heading: 90.0,
-//             height: 120.0
-//         };
-
-//         // Exercise
-//         let next_poses = calculate_next_poses(&initial_pose);
-
-//         assert!
-
-//     }
-// }

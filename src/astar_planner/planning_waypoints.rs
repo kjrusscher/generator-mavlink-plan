@@ -33,12 +33,12 @@ fn round_point(value: f64) -> f64 {
 
 fn round_height(value: f64) -> f64 {
     // 10 meter resolution
-    (value * 10.0).round() / 10.0
+    (value / 10.0).round() * 10.0
 }
 
 fn round_heading(value: f64) -> f64 {
-    // 10 degrees resolution
-    (value * 10.0).round() / 10.0
+    // 45 degrees resolution
+    (value / 45.0).round() * 45.0
 }
 
 impl Eq for Node {}
@@ -51,7 +51,7 @@ impl PartialEq for Node {
 
 impl Ord for Node {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.f.partial_cmp(&other.f).unwrap_or(Ordering::Equal)
+        other.f.partial_cmp(&self.f).unwrap_or(Ordering::Equal)
     }
 }
 

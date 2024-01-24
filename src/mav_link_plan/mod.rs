@@ -124,7 +124,7 @@ impl Default for MavLinkSimpleItem {
 
 impl Default for MavLinkPlan {
     fn default() -> Self {
-        let geo_fence_polygon = GeoFencePolygon {
+        let geo_fence_polygon_grens = GeoFencePolygon {
             inclusion: true,
             version: 1,
             polygon: vec![
@@ -147,10 +147,33 @@ impl Default for MavLinkPlan {
                 [52.281442698183156, 6.8598604985957365],
             ],
         };
+        let geo_fence_polygon_spoorlijn = GeoFencePolygon
+        {
+            inclusion: false,
+            version: 1,
+            polygon: vec![
+                [
+                    52.28397132247375,
+                    6.863886719371692
+                ],
+                [
+                    52.2911115585158,
+                    6.8829664192158475
+                ],
+                [
+                    52.29095744346746,
+                    6.883631641810979
+                ],
+                [
+                    52.28354519237769,
+                    6.863920220780301
+                ]
+            ],
+        };
 
         let geo_fence = GeoFence {
             circles: vec![],
-            polygons: vec![geo_fence_polygon],
+            polygons: vec![geo_fence_polygon_grens, geo_fence_polygon_spoorlijn],
             version: 2,
         };
 
@@ -180,9 +203,8 @@ impl Default for MavLinkPlan {
 }
 
 impl MavLinkPlan {
-    pub fn new(wind_direction_10m: i32, _wind_direction_80m: i32) -> Self {
+    pub fn new(wind_direction_10m: i32, path: &Vec<geo::Point>) -> Self {
         let mut plan = MavLinkPlan::default();
-        // let geod = Geodesic::wgs84();
 
         let direction_take_off = f64::from(wind_direction_10m);
 
@@ -191,38 +213,14 @@ impl MavLinkPlan {
 
         plan.add_take_off_sequence(direction_take_off, home_position_drone);
 
-        // plan.add_waypoint(80, 52.28528971356268, 6.906843683019673);
-        // plan.add_waypoint(85, 52.28619508983822, 6.907700944308999);
-        // plan.add_waypoint(90, 52.28700933019922, 6.906646500436068);
-        // plan.add_waypoint(95, 52.28691788742173, 6.904588489118652);
-        // plan.add_waypoint(120, 52.27967402543756, 6.889267721564778);
-        // plan.add_waypoint(120, 52.27892018775579, 6.878703588517652);
-        // plan.add_waypoint(120, 52.27938806255716, 6.876429240060219);
-        // plan.add_waypoint(120, 52.280655681513785, 6.87645870522141);
-        // plan.add_waypoint(120, 52.28111306136718, 6.878545693531606);
-        // plan.add_waypoint(120, 52.281507456033765, 6.897465752194307);
-        // plan.add_waypoint(120, 52.28521598112396, 6.907070280875956);
-        // plan.add_waypoint(120, 52.28623948195102, 6.908008241913279);
-        // plan.add_waypoint(120, 52.28716558760136, 6.906745978228713);
-        // plan.add_waypoint(120, 52.286970052792455, 6.9044260509882065);
-        //
-        // plan.add_special_waypoint(
-        //     None,
-        //     MavCmd::MAV_CMD_DO_JUMP,
-        //     [
-        //         Some(9.0),
-        //         Some(10.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //     ],
-        // );
-        //
-        // plan.add_waypoint(80, 52.28381947097879, 6.901992010013913);
+        for point in path.iter() {
+            plan.add_waypoint(120, point.x(), point.y());
+        }
+        // for point in path.iter().rev() {
+        //     plan.add_waypoint(120, point.x(), point.y());
+        // }
 
-        plan.add_landing_sequence(direction_take_off, home_position_drone);
+        // plan.add_landing_sequence(direction_take_off, home_position_drone);
 
         return plan;
     }
