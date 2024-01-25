@@ -1,4 +1,6 @@
 //! Data structs for the .plan file
+use core::num;
+
 use geo;
 use geographiclib_rs::{DirectGeodesic, Geodesic};
 use serde::{Deserialize, Serialize};
@@ -10,6 +12,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(non_camel_case_types)]
 pub enum MavCmd {
     MAV_CMD_NAV_WAYPOINT = 16,
+    MAV_CMD_NAV_LOITER_UNLIM = 17,
     MAV_CMD_NAV_LAND = 21,
     MAV_CMD_NAV_TAKEOFF = 22,
     MAV_CMD_DO_JUMP = 177,
@@ -147,27 +150,14 @@ impl Default for MavLinkPlan {
                 [52.281442698183156, 6.8598604985957365],
             ],
         };
-        let geo_fence_polygon_spoorlijn = GeoFencePolygon
-        {
+        let geo_fence_polygon_spoorlijn = GeoFencePolygon {
             inclusion: false,
             version: 1,
             polygon: vec![
-                [
-                    52.28397132247375,
-                    6.863886719371692
-                ],
-                [
-                    52.2911115585158,
-                    6.8829664192158475
-                ],
-                [
-                    52.29095744346746,
-                    6.883631641810979
-                ],
-                [
-                    52.28354519237769,
-                    6.863920220780301
-                ]
+                [52.28397132247375, 6.863886719371692],
+                [52.2911115585158, 6.8829664192158475],
+                [52.29095744346746, 6.883631641810979],
+                [52.28354519237769, 6.863920220780301],
             ],
         };
 
@@ -213,19 +203,29 @@ impl MavLinkPlan {
 
         plan.add_take_off_sequence(direction_take_off, home_position_drone);
 
-        for point in path.iter() {
-            plan.add_waypoint(120, point.x(), point.y());
-            println!("x {} | y {}", point.x(), point.y());
+        let number_of_waypoints = path.len();
+        for (index, point) in path.iter().enumerate() {
+            if index < (number_of_waypoints - 1) {
+                plan.add_waypoint(120, point.x(), point.y());
+            } else {
+                // Add loiter point.
+                plan.add_special_waypoint(
+                    Some(120),
+                    MavCmd::MAV_CMD_NAV_LOITER_UNLIM,
+                    [
+                        Some(0.0),
+                        Some(0.0),
+                        Some(140.0),
+                        None,
+                        Some(point.x()),
+                        Some(point.y()),
+                        Some(120.0),
+                    ],
+                );
+            }
         }
 
-        plan.add_waypoint(120, 52.28838126, 6.8706142);
-        // for point in path.iter().rev() {
-        //     plan.add_waypoint(120, point.x(), point.y());
-        // }
-
-        // plan.add_landing_sequence(direction_take_off, home_position_drone);
-
-        return plan;
+        plan
     }
 
     fn add_take_off_sequence(&mut self, direction_take_off: f64, home_position_drone: geo::Point) {

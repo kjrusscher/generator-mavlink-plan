@@ -181,7 +181,9 @@ impl Sandbox for MavlinkPlanGenerator {
                 // goal ver weg
                 // let goal_position = geo::Point::new(52.3825397, 6.9984103);
                 // let goal_position = geo::Point::new(52.28458212,6.86716039);
-                let goal_position = geo::Point::new(52.28838126, 6.8706142);
+                // let goal_position = geo::Point::new(52.28838126, 6.8706142);
+                // let goal_position = geo::Point::new(52.2818941, 6.8786913);
+                let goal_position = geo::Point::new(52.2738255, 6.8779212);
                 let mut test_a_star_planner =
                     astar_planner::AStarPlanner::new(start_position, start_heading, goal_position)
                         .unwrap();

@@ -83,7 +83,7 @@ impl AStarPlanner {
         self.optimal_path.clear();
         let geod = Geodesic::wgs84();
 
-        let distance_increment = 250.0;
+        let distance_increment = 140.0;
 
         let mut path_not_found: bool = true;
         let mut point_in_reach_of_goal: BinaryHeap<Rc<Node>> = BinaryHeap::new();
@@ -125,25 +125,26 @@ impl AStarPlanner {
                 );
                 if distance < distance_increment {
                     path_not_found = false;
-                    println!("Goal pose is reached");
-                    // self.optimal_path.push(Rc::clone(&node));
                     point_in_reach_of_goal.push(Rc::clone(&node));
                     self.closed_set.insert(node.pose, node);
-                    // break;
                 } else {
                     // Push new positions to Open Set
                     self.open_set.push(node);
                 }
             }
-            
+
             // Push top position to Closed Set
             self.closed_set.insert(parent.pose, parent);
         }
-        self.optimal_path.push(Rc::clone(&point_in_reach_of_goal.pop().unwrap()));
+        self.optimal_path
+            .push(Rc::clone(&point_in_reach_of_goal.pop().unwrap()));
 
         // Fill the vector with waypoints from goal pose to start pose.
         loop {
-            let node = self.closed_set.get(&self.optimal_path[self.optimal_path.len()-1].pose).unwrap();
+            let node = self
+                .closed_set
+                .get(&self.optimal_path[self.optimal_path.len() - 1].pose)
+                .unwrap();
             match &node.parent {
                 Some(value) => self.optimal_path.push(Rc::clone(&value)),
                 None => break,
@@ -157,6 +158,8 @@ impl AStarPlanner {
         for point in self.optimal_path.iter().rev() {
             optimal_path.push(point.pose.position);
         }
+
+        optimal_path.push(self.goal_pose.position);
 
         println!(
             "# waypoints: {} | # closed set {} | # open set {}",
@@ -175,9 +178,9 @@ impl AStarPlanner {
             all_points.push(node.pose.position);
         }
 
-        for node in self.open_set.iter() {
-            all_points.push(node.pose.position);
-        }
+        // for node in self.open_set.iter() {
+        //     all_points.push(node.pose.position);
+        // }
 
         return all_points;
     }
@@ -203,8 +206,12 @@ impl GeospatialPose {
         next_poses.push(self.calculate_next_pose(-45.0, distance_increment));
         // turn 22.5 degree left
         next_poses.push(self.calculate_next_pose(-22.5, distance_increment));
+        // turn 11.25 degree left
+        next_poses.push(self.calculate_next_pose(-11.25, distance_increment));
         // straight ahead
         next_poses.push(self.calculate_next_pose(0.0, distance_increment));
+        // turn 11.25 degrees right
+        next_poses.push(self.calculate_next_pose(11.25, distance_increment));        
         // turn 22.5 degrees right
         next_poses.push(self.calculate_next_pose(22.5, distance_increment));
         // turn 45 degrees right
@@ -244,7 +251,7 @@ impl GeospatialPose {
                 chord_length,
             );
             let point_left_90 = geo::Point::new(lat, lon);
-            println!("new heading {}", new_heading);
+
             GeospatialPose {
                 position: point_left_90,
                 heading: new_heading,
@@ -264,10 +271,10 @@ impl GeospatialPose {
             // new_heading;
         }
 
-        println!(
-            "heading {} | new heading {} | angle {}",
-            self.heading, new_heading, angle
-        );
+        // println!(
+        //     "heading {} | new heading {} | angle {}",
+        //     self.heading, new_heading, angle
+        // );
 
         return new_heading;
     }
@@ -282,8 +289,8 @@ impl GeospatialPose {
 /// Fixed wing drone flies on circle arcs. Next position is calculated in a straight line.
 /// *Limitation*: heading range is [-90...90] degrees.
 ///
-/// * arc_length - Distance traveled over circle arc.
-/// * angle_degrees - Heading change.
+/// * arc_length: Distance traveled over circle arc.
+/// * angle_degrees: Heading change.
 fn chord_length(arc_length: f64, angle_degrees: f64) -> f64 {
     if angle_degrees > 90.0 || angle_degrees < -90.0 {
         panic!("Heading change out of range!");
@@ -310,16 +317,60 @@ fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
     let (lat2, lon2) = (goal_pose.position.x(), goal_pose.position.y()); // Goal Position
     let (s12, az1, _, _) = geod.inverse(lat1, lon1, lat2, lon2);
 
-    let mut new_heading = (pose.heading - az1).abs();
+    let azimuth: f64;
+    if az1 < 0.0 {
+        azimuth = 360.0 - az1.abs();
+    } else {
+        azimuth = az1;
+    }
+
+    let mut new_heading = (pose.heading - azimuth).abs();
     if new_heading > 180.0 {
         new_heading = 360.0 - new_heading;
     }
     let new_heading_rad = new_heading * 2.0 * PI / 360.0;
 
-    let start_position: PosRot = PosRot::from_f32(0.0, 0.0, new_heading_rad as f32);
-    let goal_position: PosRot = PosRot::from_f32(s12 as f32, 0.0, 0.0);
-    let shortest_path_possible =
-        DubinsPath::shortest_from(start_position, goal_position, 140.0).unwrap();
+    let distance: f64;
+    if s12 > 280.0 {
+        distance = simplified_dubins_path(new_heading_rad, s12);
+    } else {
+        let start_position: PosRot = PosRot::from_f32(0.0, 0.0, new_heading_rad as f32);
+        let goal_position: PosRot = PosRot::from_f32(s12 as f32, 0.0, 0.0);
+        let shortest_path_possible =
+            DubinsPath::shortest_from(start_position, goal_position, 140.0).unwrap();
+        distance = shortest_path_possible.length() as f64;
+    }
 
-    shortest_path_possible.length() as f64
+    distance
+}
+
+/// Calculate length of Dubins Path for Left Turn - Straight
+///
+/// The Dubins Paths algoritm from the Rust Crate has to have an end orientation.
+/// Having an end orientation results is non-optimal paths for the drone as we don't care 
+/// about the end position of the drone.
+/// This function is a simplified version of the Dubins Path algorithm
+/// * It does only Left Turn - Straight.
+/// * It does not care about the end position.
+/// * Start position is [0.0, 0.0, theta]
+/// * End position is [0.0, distance, None]
+///
+/// Inputs
+/// * theta: orientation with respect to line from start to end position.
+/// * distance: total distance from start to end position.
+fn simplified_dubins_path(theta: f64, distance: f64) -> f64 {
+    if theta < 0.0 || theta > 180.0 {
+        panic!("Angle is too big or too small! {}", theta);
+    }
+
+    let radius = 140.0;
+    let distance_y = radius * (1.0 - theta.cos());
+
+    let gamma = PI / 2.0 - (distance_y / distance).acos();
+    let arc_length = (2.0 * PI * radius) * ((gamma + theta) / (2.0 * PI));
+
+    let tussen_calc = distance_y / gamma.cos();
+    let straight_length = (distance * distance - tussen_calc * tussen_calc).sqrt();
+
+    arc_length + straight_length
 }
