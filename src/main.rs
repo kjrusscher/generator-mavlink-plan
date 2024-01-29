@@ -4,8 +4,8 @@ pub mod astar_planner;
 pub mod mav_link_plan;
 
 use iced::widget::{
-    button, column, container, pick_list, row, scrollable, text, vertical_space, Button, Column,
-    Container, Space, Text,
+    column, container, pick_list, row, scrollable, text, vertical_space, Button, Column, Container,
+    Space, Text, TextInput,
 };
 use iced::{Alignment, Element, Length, Sandbox, Settings};
 use notify_rust::Notification;
@@ -59,26 +59,38 @@ struct WindData {
     direction_120m: Option<i32>,
 }
 
-/// Stores state information for application
-struct MavlinkPlanGenerator {
-    plan: Option<MavLinkPlan>,
+struct AppWeatherInfo {
     weather_data: Option<WeatherData>,
     wind_unit: Option<String>,
     data: HashMap<String, WindData>,
     wind_data: WindData,
-    optimal_path: Vec<geo::Point>,
-    pick_list_time: PickListTime,
-    pop_up: PopUpInfo,
 }
 
-struct PopUpInfo {
+struct AppPopUpInfo {
     text: String,
     show: bool,
 }
 
-struct PickListTime {
+struct AppPickListTime {
     time_options: Vec<String>,
     selected_time: Option<String>,
+}
+
+struct AppPositionInfo {
+    drone_position: geo::Point,
+    take_off_waypoints: Vec<geo::Point>,
+    landing_waypoints: Vec<geo::Point>,
+    goal_position: geo::Point,
+    optimal_path: Vec<geo::Point>,
+}
+
+/// Stores state information for application
+struct MavlinkPlanGenerator {
+    plan: Option<MavLinkPlan>,
+    position_info: AppPositionInfo,
+    weather_info: AppWeatherInfo,
+    pick_list_time: AppPickListTime,
+    pop_up: AppPopUpInfo,
 }
 
 /// Definitions for Iced
@@ -86,31 +98,34 @@ struct PickListTime {
 enum Message {
     OptionSelected(String),
     SavePressed,
-    AStarTest,
+    PlanRoute,
     UpdateWeatherInfo,
     PopUpPressed,
+    InputDroneLongitudeChanged(String),
+    InputDroneLatitudeChanged(String),
+    InputGoalLongitudeChanged(String),
+    InputGoalLatitudeChanged(String),
 }
 
 impl Sandbox for MavlinkPlanGenerator {
     type Message = Message;
 
     fn new() -> MavlinkPlanGenerator {
-        let mut data = HashMap::new();
-        let mut weather_info = None;
-        let mut wind_unit = None;
+        let data = HashMap::new();
+        let weather_info = None;
+        let wind_unit = None;
 
-        let pick_list_time = PickListTime {
+        let pick_list_time = AppPickListTime {
             time_options: Vec::new(),
             selected_time: None,
         };
 
-        let pop_up_info = PopUpInfo{
+        let pop_up_info = AppPopUpInfo {
             text: "".to_string(),
             show: false,
         };
 
-        MavlinkPlanGenerator {
-            plan: None,
+        let weather_info = AppWeatherInfo {
             data: data,
             weather_data: weather_info,
             wind_unit: wind_unit,
@@ -119,7 +134,20 @@ impl Sandbox for MavlinkPlanGenerator {
                 direction_80m: None,
                 direction_120m: None,
             },
+        };
+
+        let geo_info = AppPositionInfo {
+            drone_position: geo::Point::new(52.2825397, 6.8984103),
+            goal_position: geo::Point::new(52.2738255, 6.8779212),
+            take_off_waypoints: Vec::new(),
+            landing_waypoints: Vec::new(),
             optimal_path: Vec::new(),
+        };
+
+        MavlinkPlanGenerator {
+            plan: None,
+            weather_info: weather_info,
+            position_info: geo_info,
             pick_list_time: pick_list_time,
             pop_up: pop_up_info,
         }
@@ -133,18 +161,21 @@ impl Sandbox for MavlinkPlanGenerator {
         match message {
             Message::OptionSelected(time) => {
                 self.pick_list_time.selected_time = Some(time);
-                self.wind_data = WindData {
+                self.weather_info.wind_data = WindData {
                     direction_10m: self
+                        .weather_info
                         .data
                         .get(&self.pick_list_time.selected_time.clone().unwrap())
                         .unwrap()
                         .direction_10m,
                     direction_80m: self
+                        .weather_info
                         .data
                         .get(&self.pick_list_time.selected_time.clone().unwrap())
                         .unwrap()
                         .direction_80m,
                     direction_120m: self
+                        .weather_info
                         .data
                         .get(&self.pick_list_time.selected_time.clone().unwrap())
                         .unwrap()
@@ -152,16 +183,16 @@ impl Sandbox for MavlinkPlanGenerator {
                 };
             }
             Message::SavePressed => {
-                if self.optimal_path.len() == 0 {
-                    self.pop_up.text = "Plan eerst een route".to_string();
-                    self.pop_up.show = true;
-                } else if self.pick_list_time.selected_time.is_none() {
+                if self.pick_list_time.selected_time.is_none() {
                     self.pop_up.text = "Selecteer een tijd".to_string();
+                    self.pop_up.show = true;
+                } else if self.position_info.optimal_path.len() == 0 {
+                    self.pop_up.text = "Plan eerst een route".to_string();
                     self.pop_up.show = true;
                 } else {
                     self.plan = Some(MavLinkPlan::new(
-                        self.wind_data.direction_10m.unwrap(),
-                        &self.optimal_path,
+                        self.weather_info.wind_data.direction_10m.unwrap(),
+                        &self.position_info.optimal_path,
                     ));
 
                     let file_name = format!(
@@ -184,23 +215,20 @@ impl Sandbox for MavlinkPlanGenerator {
                         .unwrap();
                 }
             }
-            Message::AStarTest => {
-                println!("AStar pressed");
+            Message::PlanRoute => {
+                println!("PlanRoute pressed");
                 let start_position = geo::Point::new(52.2825397, 6.8984103);
                 let start_heading = 80.0;
-                // goal ver weg
-                // let goal_position = geo::Point::new(52.3825397, 6.9984103);
-                // let goal_position = geo::Point::new(52.28458212,6.86716039);
-                // let goal_position = geo::Point::new(52.28838126, 6.8706142);
-                // let goal_position = geo::Point::new(52.2818941, 6.8786913);
-                let goal_position = geo::Point::new(52.2738255, 6.8779212);
-                let mut test_a_star_planner =
-                    astar_planner::AStarPlanner::new(start_position, start_heading, goal_position)
-                        .unwrap();
+                let mut test_a_star_planner = astar_planner::AStarPlanner::new(
+                    start_position,
+                    start_heading,
+                    self.position_info.goal_position,
+                )
+                .unwrap();
                 let start = Instant::now();
                 test_a_star_planner.calculate_path();
                 let duration = start.elapsed();
-                self.optimal_path = test_a_star_planner.get_optimal_path();
+                self.position_info.optimal_path = test_a_star_planner.get_optimal_path();
                 // self.optimal_path = test_a_star_planner.get_all_points();
                 println!("Route geplanned in {:.1?}.", duration);
             }
@@ -211,7 +239,8 @@ impl Sandbox for MavlinkPlanGenerator {
                         let weather_info: WeatherData;
                         weather_info = serde_json::from_reader(weather_response).unwrap();
 
-                        self.wind_unit = Some(weather_info.hourly_units.winddirection_10m.clone());
+                        self.weather_info.wind_unit =
+                            Some(weather_info.hourly_units.winddirection_10m.clone());
 
                         for i in 0..weather_info.hourly.time.len() {
                             let wind_data = WindData {
@@ -220,14 +249,36 @@ impl Sandbox for MavlinkPlanGenerator {
                                 direction_120m: Some(weather_info.hourly.winddirection_120m[i]),
                             };
 
-                            self.data
+                            self.weather_info
+                                .data
                                 .insert(weather_info.hourly.time[i].clone(), wind_data);
                         }
                         self.pick_list_time.time_options = weather_info.hourly.time.clone();
-                        self.pick_list_time.selected_time = Some(self.pick_list_time.time_options[0].clone());
-                        self.weather_data = Some(weather_info);
+                        self.pick_list_time.selected_time =
+                            Some(self.pick_list_time.time_options[0].clone());
+                        self.weather_info.weather_data = Some(weather_info);
+                        self.weather_info.wind_data = WindData {
+                            direction_10m: self
+                                .weather_info
+                                .data
+                                .get(&self.pick_list_time.selected_time.clone().unwrap())
+                                .unwrap()
+                                .direction_10m,
+                            direction_80m: self
+                                .weather_info
+                                .data
+                                .get(&self.pick_list_time.selected_time.clone().unwrap())
+                                .unwrap()
+                                .direction_80m,
+                            direction_120m: self
+                                .weather_info
+                                .data
+                                .get(&self.pick_list_time.selected_time.clone().unwrap())
+                                .unwrap()
+                                .direction_120m,
+                        };
                     }
-                    Err(error) => {
+                    Err(_) => {
                         self.pop_up.text = "Kon geen weersinformatie ophalen. Waarschijnlijk geen internetverbinding".to_string();
                         self.pop_up.show = true;
                     }
@@ -236,10 +287,57 @@ impl Sandbox for MavlinkPlanGenerator {
             Message::PopUpPressed => {
                 self.pop_up.show = false;
             }
+            Message::InputDroneLongitudeChanged(string_value) => {
+                if let Ok(value) = string_value.parse::<f64>() {
+                    self.position_info.drone_position.set_x(value);
+                }
+            }
+            Message::InputDroneLatitudeChanged(string_value) => {
+                if let Ok(value) = string_value.parse::<f64>() {
+                    self.position_info.drone_position.set_x(value);
+                }
+            }
+            Message::InputGoalLongitudeChanged(string_value) => {
+                if let Ok(value) = string_value.parse::<f64>() {
+                    self.position_info.goal_position.set_x(value);
+                }
+            }
+            Message::InputGoalLatitudeChanged(string_value) => {
+                if let Ok(value) = string_value.parse::<f64>() {
+                    self.position_info.goal_position.set_y(value);
+                }
+            }
         }
     }
 
     fn view(&self) -> Element<Message> {
+        let start_location_text = text(format!("Drone")).size(25);
+        let drone_longitude = TextInput::new(
+            "Longitude",
+            &self.position_info.drone_position.x().to_string(),
+        )
+        .on_input(Message::InputDroneLongitudeChanged)
+        .width(Length::Fixed(150.0));
+        let drone_latitude = TextInput::new(
+            "Latitude ",
+            &self.position_info.drone_position.y().to_string(),
+        )
+        .on_input(Message::InputDroneLatitudeChanged)
+        .width(Length::Fixed(150.0));
+
+        let input_longitude = TextInput::new(
+            "Longitude",
+            &self.position_info.goal_position.x().to_string(),
+        )
+        .on_input(Message::InputGoalLongitudeChanged)
+        .width(Length::Fixed(150.0));
+        let input_latitude = TextInput::new(
+            "Latitude ",
+            &self.position_info.goal_position.y().to_string(),
+        )
+        .on_input(Message::InputGoalLatitudeChanged)
+        .width(Length::Fixed(150.0));
+
         let picklist = pick_list(
             &self.pick_list_time.time_options,
             self.pick_list_time.selected_time.clone(),
@@ -247,20 +345,15 @@ impl Sandbox for MavlinkPlanGenerator {
         )
         .placeholder("Kies een tijd...");
 
-        let start_position = geo::Point::new(52.2825397, 6.8984103);
-
-        let start_location_text = text(format!("Drone positie:")).size(25);
-        let start_location_gps = text(format!(
-            "long: {:.2}, latt: {:.2}",
-            start_position.x(),
-            start_position.y() // self.plan.mission.plannedHomePosition[0], self.plan.mission.plannedHomePosition[1]
-        ))
-        .size(20);
-
         let left_column = column![
             vertical_space(60),
             start_location_text,
-            start_location_gps,
+            row!["Longitude:", drone_longitude].align_items(Alignment::Center),
+            row!["Latitude: ", drone_latitude].align_items(Alignment::Center),
+            vertical_space(30),
+            text(format!("Doel")).size(25),
+            row!["Longitude:", input_longitude].align_items(Alignment::Center),
+            row!["Latitude: ", input_latitude].align_items(Alignment::Center),
             vertical_space(30),
             text(format!("Wanneer wil je vliegen?")).size(25),
             picklist,
@@ -272,28 +365,48 @@ impl Sandbox for MavlinkPlanGenerator {
 
         let wind_direction_10 = text(format!(
             " 10 meter: {}{}",
-            self.wind_data.direction_10m.unwrap_or(0).to_string(),
-            self.wind_unit.as_ref().unwrap_or(&"°".to_string())
+            self.weather_info
+                .wind_data
+                .direction_10m
+                .unwrap_or(0)
+                .to_string(),
+            self.weather_info
+                .wind_unit
+                .as_ref()
+                .unwrap_or(&"°".to_string())
         ))
         .size(20);
         let wind_direction_80 = text(format!(
             " 80 meter: {}{}",
-            self.wind_data.direction_80m.unwrap_or(0).to_string(),
-            self.wind_unit.as_ref().unwrap_or(&"°".to_string())
+            self.weather_info
+                .wind_data
+                .direction_80m
+                .unwrap_or(0)
+                .to_string(),
+            self.weather_info
+                .wind_unit
+                .as_ref()
+                .unwrap_or(&"°".to_string())
         ))
         .size(20);
         let wind_direction_120 = text(format!(
             "120 meter: {}{}",
-            self.wind_data.direction_120m.unwrap_or(0).to_string(),
-            self.wind_unit.as_ref().unwrap_or(&"°".to_string())
+            self.weather_info
+                .wind_data
+                .direction_120m
+                .unwrap_or(0)
+                .to_string(),
+            self.weather_info
+                .wind_unit
+                .as_ref()
+                .unwrap_or(&"°".to_string())
         ))
         .size(20);
-        let button_weather =
-            Button::new("Update").on_press(Message::UpdateWeatherInfo);
+        let button_weather = Button::new("Update").on_press(Message::UpdateWeatherInfo);
 
         let middle_column = column![
             vertical_space(60),
-            text(format!("Windrichting op:")).size(25),
+            text(format!("Windrichting")).size(25),
             wind_direction_10,
             wind_direction_80,
             wind_direction_120,
@@ -304,10 +417,8 @@ impl Sandbox for MavlinkPlanGenerator {
         .align_items(Alignment::Center)
         .spacing(10);
 
-        // let button = button("Opslaan").on_press(Message::SavePressed);
-        // Create the button
         let button_save = Button::new("Opslaan").on_press(Message::SavePressed);
-        let button_astar_test = Button::new("Plan Route").on_press(Message::AStarTest);
+        let button_astar_test = Button::new("Plan Route").on_press(Message::PlanRoute);
 
         let right_column = column![
             vertical_space(60),
@@ -321,7 +432,7 @@ impl Sandbox for MavlinkPlanGenerator {
         .spacing(10);
 
         let main_content = row![left_column, middle_column, right_column]
-            .align_items(Alignment::Center)
+            .align_items(Alignment::Start)
             .spacing(20);
 
         let main_container: Container<'_, Message> = container(scrollable(main_content))
@@ -343,9 +454,9 @@ impl Sandbox for MavlinkPlanGenerator {
 
             // Overlay the popup over the main popup_content
             popup_content = popup_content
-                .push(Space::with_height(Length::FillPortion(1)))
+                .push(Space::with_height(Length::Fill))
                 .push(popup_container)
-                .push(Space::with_height(Length::FillPortion(1)));
+                .push(Space::with_height(Length::Fill));
         }
 
         Container::new(popup_content)
@@ -356,13 +467,13 @@ impl Sandbox for MavlinkPlanGenerator {
 }
 
 pub fn main() -> iced::Result {
-    let file = std::fs::read_to_string("Geofence_Fase_1_zonder_exclusion_zone.plan").unwrap();
-    let plan: mav_link_plan::MavLinkPlan = serde_json::from_str(&file).unwrap();
-    println!(
-        "{}:{}: inclusion is {}.",
-        file!(),
-        line!(),
-        plan.geoFence.polygons[0].inclusion
-    );
+    // let file = std::fs::read_to_string("Geofence_Fase_1_zonder_exclusion_zone.plan").unwrap();
+    // let plan: mav_link_plan::MavLinkPlan = serde_json::from_str(&file).unwrap();
+    // println!(
+    //     "{}:{}: inclusion is {}.",
+    //     file!(),
+    //     line!(),
+    //     plan.geoFence.polygons[0].inclusion
+    // );
     MavlinkPlanGenerator::run(Settings::default())
 }
