@@ -224,6 +224,7 @@ impl Sandbox for MavlinkPlanGenerator {
                                 .insert(weather_info.hourly.time[i].clone(), wind_data);
                         }
                         self.pick_list_time.time_options = weather_info.hourly.time.clone();
+                        self.pick_list_time.selected_time = Some(self.pick_list_time.time_options[0].clone());
                         self.weather_data = Some(weather_info);
                     }
                     Err(error) => {
@@ -245,12 +246,6 @@ impl Sandbox for MavlinkPlanGenerator {
             Message::OptionSelected,
         )
         .placeholder("Kies een tijd...");
-        // let picklist = pick_list(
-        //     &self.weather_data.hourly.time,
-        //     self.selected_time.clone(),
-        //     Message::OptionSelected,
-        // )
-        // .placeholder("Kies een tijd...");
 
         let start_position = geo::Point::new(52.2825397, 6.8984103);
 
@@ -294,7 +289,7 @@ impl Sandbox for MavlinkPlanGenerator {
         ))
         .size(20);
         let button_weather =
-            Button::new("Update Weersinformatie").on_press(Message::UpdateWeatherInfo);
+            Button::new("Update").on_press(Message::UpdateWeatherInfo);
 
         let middle_column = column![
             vertical_space(60),
@@ -312,7 +307,7 @@ impl Sandbox for MavlinkPlanGenerator {
         // let button = button("Opslaan").on_press(Message::SavePressed);
         // Create the button
         let button_save = Button::new("Opslaan").on_press(Message::SavePressed);
-        let button_astar_test = Button::new("Plan Route").on_press((Message::AStarTest));
+        let button_astar_test = Button::new("Plan Route").on_press(Message::AStarTest);
 
         let right_column = column![
             vertical_space(60),
