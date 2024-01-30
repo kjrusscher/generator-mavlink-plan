@@ -1,8 +1,6 @@
 //! Data structs for the .plan file
-use core::num;
-
 use geo;
-use geographiclib_rs::{DirectGeodesic, Geodesic};
+// use geographiclib_rs::{DirectGeodesic, Geodesic};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -229,7 +227,7 @@ impl MavLinkPlan {
     }
 
     fn add_take_off_sequence(&mut self, direction_take_off: f64, home_position_drone: geo::Point) {
-        let geod = Geodesic::wgs84();
+        // let geod = Geodesic::wgs84();
 
         self.add_special_waypoint(
             Some(30),
@@ -274,59 +272,59 @@ impl MavLinkPlan {
         // self.add_waypoint(60, current_point.x(), current_point.y());
     }
 
-    fn add_landing_sequence(&mut self, direction_take_off: f64, home_position_drone: geo::Point) {
-        let geod = Geodesic::wgs84();
+    // fn add_landing_sequence(&mut self, direction_take_off: f64, home_position_drone: geo::Point) {
+    //     let geod = Geodesic::wgs84();
 
-        let direction_landing: f64;
-        if direction_take_off < 180.0 {
-            direction_landing = direction_take_off + 180.0;
-        } else {
-            direction_landing = direction_take_off - 180.0;
-        }
+    //     let direction_landing: f64;
+    //     if direction_take_off < 180.0 {
+    //         direction_landing = direction_take_off + 180.0;
+    //     } else {
+    //         direction_landing = direction_take_off - 180.0;
+    //     }
 
-        let (mut lat, mut lon) =
-            geod.direct(home_position_drone.x(), home_position_drone.y(), 30.0, 35.0);
-        let vtol_transition = geo::Point::new(lat, lon);
+    //     let (mut lat, mut lon) =
+    //         geod.direct(home_position_drone.x(), home_position_drone.y(), 30.0, 35.0);
+    //     let vtol_transition = geo::Point::new(lat, lon);
 
-        (lat, lon) = geod.direct(
-            vtol_transition.x(),
-            vtol_transition.y(),
-            direction_landing,
-            210.0,
-        );
-        let current_point = geo::Point::new(lat, lon);
-        self.add_waypoint(60, current_point.x(), current_point.y());
+    //     (lat, lon) = geod.direct(
+    //         vtol_transition.x(),
+    //         vtol_transition.y(),
+    //         direction_landing,
+    //         210.0,
+    //     );
+    //     let current_point = geo::Point::new(lat, lon);
+    //     self.add_waypoint(60, current_point.x(), current_point.y());
 
-        self.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
+    //     self.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
 
-        self.add_special_waypoint(
-            None,
-            MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
-            [
-                Some(3.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-            ],
-        );
+    //     self.add_special_waypoint(
+    //         None,
+    //         MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
+    //         [
+    //             Some(3.0),
+    //             Some(0.0),
+    //             Some(0.0),
+    //             Some(0.0),
+    //             Some(0.0),
+    //             Some(0.0),
+    //             Some(0.0),
+    //         ],
+    //     );
 
-        self.add_special_waypoint(
-            Some(0),
-            MavCmd::MAV_CMD_NAV_LAND,
-            [
-                Some(0.0),
-                Some(1.0),
-                Some(0.0),
-                None,
-                Some(home_position_drone.x()),
-                Some(home_position_drone.y()),
-                Some(0.0),
-            ],
-        );
-    }
+    //     self.add_special_waypoint(
+    //         Some(0),
+    //         MavCmd::MAV_CMD_NAV_LAND,
+    //         [
+    //             Some(0.0),
+    //             Some(1.0),
+    //             Some(0.0),
+    //             None,
+    //             Some(home_position_drone.x()),
+    //             Some(home_position_drone.y()),
+    //             Some(0.0),
+    //         ],
+    //     );
+    // }
 
     fn add_waypoint(&mut self, height: i32, latitude: f64, longitude: f64) {
         let mut waypoint = MavLinkSimpleItem::default();

@@ -7,10 +7,12 @@
 
 //! A* path planner
 
-use crate::mav_link_plan;
+// use crate::mav_link_plan;
 
-use dubins_paths::{DubinsPath, PosRot, Result as DubinsResult};
+use dubins_paths::{DubinsPath, PosRot};
 use geo;
+use geo::algorithm::intersects::Intersects;
+use geo::Contains;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
@@ -26,7 +28,7 @@ pub struct AStarPlanner {
     closed_set: HashMap<GeospatialPose, Rc<Node>>,
     goal_pose: GeospatialPose,
     optimal_path: Vec<Rc<Node>>,
-    geofence_lines: Vec<geo::LineString>,
+    geo_fences: geo::MultiLineString,
 }
 
 impl AStarPlanner {
@@ -46,19 +48,52 @@ impl AStarPlanner {
             heading: 0.0,
         };
 
-        if !start_pose.is_valid() {
-            return Err(String::from("Ongeldige beginpositie."));
+        let geo_fence_border = geo::LineString::new(vec![
+            geo::coord! {x:52.28295542244744, y: 6.8565871319299845},
+            geo::coord! {x:52.285431953652584, y: 6.86156240560706},
+            geo::coord! {x:52.2896098479409, y: 6.8688319693996505},
+            geo::coord! {x:52.29227492433401, y: 6.875640979066702},
+            geo::coord! {x:52.2937453230195, y: 6.883632543793112},
+            geo::coord! {x:52.29268600915777, y: 6.888311871426254},
+            geo::coord! {x:52.294277072434966, y: 6.889956775263698},
+            geo::coord! {x:52.293939049265504, y: 6.896312607978928},
+            geo::coord! {x:52.29294882408129, y: 6.902284711120359},
+            geo::coord! {x:52.28900135729954, y: 6.917255476279564},
+            geo::coord! {x:52.2714465433939, y: 6.876881353338064},
+            geo::coord! {x:52.27574362849022, y: 6.869559476902992},
+            geo::coord! {x:52.27691573983945, y: 6.868882808809673},
+            geo::coord! {x:52.27793930785583, y: 6.867776234580788},
+            geo::coord! {x:52.27856267193794, y: 6.865940640293019},
+            geo::coord! {x:52.27956352880396, y: 6.862960555652251},
+            geo::coord! {x:52.281442698183156, y: 6.8598604985957365},
+            // repeat first point to close the loop
+            geo::coord! {x:52.28295542244744, y: 6.8565871319299845},
+        ]);
+
+        let geo_fence_border_polygon = geo::Polygon::new(geo_fence_border.clone(),vec![]);
+        // The start and goal position should be inside the geo_fence
+        if !geo_fence_border_polygon.contains(&start_pose.position) {
+            return Err(String::from("Ongeldige drone positie."));
         }
-        if !goal_pose.is_valid() {
-            return Err(String::from("Ongeldige eindpositie."));
+        if !geo_fence_border_polygon.contains(&goal_pose.position) {
+            return Err(String::from("Ongeldige doel positie."));
         }
+
+        let geo_fence_railway = geo::LineString::new(vec![
+            geo::coord! {x:52.28397132247375, y: 6.863886719371692},
+            geo::coord! {x:52.2911115585158, y: 6.8829664192158475},
+            geo::coord! {x:52.29095744346746, y: 6.883631641810979},
+            geo::coord! {x:52.28354519237769, y: 6.863920220780301},
+            // repeat first point to close the loop
+            geo::coord! {x:52.28397132247375, y: 6.863886719371692},
+        ]);
 
         let mut a_star_planner = AStarPlanner {
             open_set: BinaryHeap::new(),
             closed_set: HashMap::new(),
             goal_pose: goal_pose,
             optimal_path: Vec::new(),
-            geofence_lines: Vec::new(),
+            geo_fences: geo::MultiLineString::new(vec![geo_fence_border, geo_fence_railway]),
         };
 
         let cost_to_goal = calculate_h(&start_pose, &goal_pose);
@@ -95,7 +130,10 @@ impl AStarPlanner {
             let mut next_poses = parent.pose.calculate_next_poses(distance_increment);
             // Check validity of new positions
             // Check if new position are in Closed Set (already treated)
-            next_poses.retain(|&pose| pose.is_valid() && !self.closed_set.contains_key(&pose));
+            next_poses.retain(|&pose| {
+                pose.is_valid(&parent.pose, &self.geo_fences)
+                    && !self.closed_set.contains_key(&pose)
+            });
 
             // Calculate node information of new position
             for pose in next_poses.iter() {
@@ -168,7 +206,7 @@ impl AStarPlanner {
             self.open_set.len()
         );
 
-        return optimal_path;
+        optimal_path
     }
 
     pub fn get_all_points(&self) -> Vec<geo::Point> {
@@ -182,7 +220,7 @@ impl AStarPlanner {
         //     all_points.push(node.pose.position);
         // }
 
-        return all_points;
+        all_points
     }
 
     // pub fn fill_geofence(&self, geo_fence: &mav_link_plan::GeoFence) {
@@ -190,7 +228,7 @@ impl AStarPlanner {
     //         let p_last = geo_fence_polygon.polygon[geo_fence_polygon.polygon.len() - 1];
     //         for test in geo_fence_polygon.polygon.iter() {
 
-    //             self.geofence_lines.push(lin)
+    //             self.geo_fences.push(lin)
     //         }
     //     }
     // }
@@ -200,8 +238,6 @@ impl GeospatialPose {
     fn calculate_next_poses(&self, distance_increment: f64) -> Vec<GeospatialPose> {
         let mut next_poses = Vec::new();
 
-        // turn 90 degree left
-        // next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
         // turn 45 degree left
         next_poses.push(self.calculate_next_pose(-45.0, distance_increment));
         // turn 22.5 degree left
@@ -211,13 +247,11 @@ impl GeospatialPose {
         // straight ahead
         next_poses.push(self.calculate_next_pose(0.0, distance_increment));
         // turn 11.25 degrees right
-        next_poses.push(self.calculate_next_pose(11.25, distance_increment));        
+        next_poses.push(self.calculate_next_pose(11.25, distance_increment));
         // turn 22.5 degrees right
         next_poses.push(self.calculate_next_pose(22.5, distance_increment));
         // turn 45 degrees right
         next_poses.push(self.calculate_next_pose(45.0, distance_increment));
-        // turn 90 degrees right
-        // next_poses.push(self.calculate_next_pose(90.0, distance_increment));
 
         return next_poses;
     }
@@ -267,20 +301,22 @@ impl GeospatialPose {
             new_heading += 360.0;
         } else if new_heading >= 360.0 {
             new_heading -= 360.0;
-            // } else {
-            // new_heading;
         }
 
-        // println!(
-        //     "heading {} | new heading {} | angle {}",
-        //     self.heading, new_heading, angle
-        // );
-
-        return new_heading;
+        new_heading
     }
 
-    fn is_valid(&self) -> bool {
-        true
+    fn is_valid(&self, parent_pose: &GeospatialPose, geo_fence: &geo::MultiLineString) -> bool {
+        let drone_path = geo::Line::new(
+            geo::coord! {x:parent_pose.position.x(), y:parent_pose.position.y()},
+            geo::coord! {x:self.position.x(), y:self.position.y()},
+        );
+
+        if geo_fence.intersects(&drone_path) {
+            false
+        } else {
+            true
+        }
     }
 }
 
@@ -307,7 +343,12 @@ fn chord_length(arc_length: f64, angle_degrees: f64) -> f64 {
 
 /// Calculate cost so far
 fn calculate_g(child_pose: &GeospatialPose, parent_node: &Node, distance_increment: f64) -> f64 {
-    parent_node.traveled_distance + distance_increment
+    // parent_node.g + distance_increment
+    let steering_weight = 4.0;
+    let steering = heading_difference(child_pose.heading, parent_node.pose.heading);
+    parent_node.g
+        + distance_increment
+        + steering_weight * steering * steering
 }
 
 /// Calculate cost to goal
@@ -324,10 +365,7 @@ fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
         azimuth = az1;
     }
 
-    let mut new_heading = (pose.heading - azimuth).abs();
-    if new_heading > 180.0 {
-        new_heading = 360.0 - new_heading;
-    }
+    let new_heading = heading_difference(pose.heading, azimuth);
     let new_heading_rad = new_heading * 2.0 * PI / 360.0;
 
     let distance: f64;
@@ -341,13 +379,15 @@ fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
         distance = shortest_path_possible.length() as f64;
     }
 
-    distance
+    // distance
+    let steering_weight = 4.0;
+    distance + steering_weight * new_heading * new_heading
 }
 
 /// Calculate length of Dubins Path for Left Turn - Straight
 ///
 /// The Dubins Paths algoritm from the Rust Crate has to have an end orientation.
-/// Having an end orientation results is non-optimal paths for the drone as we don't care 
+/// Having an end orientation results is non-optimal paths for the drone as we don't care
 /// about the end position of the drone.
 /// This function is a simplified version of the Dubins Path algorithm
 /// * It does only Left Turn - Straight.
@@ -373,4 +413,13 @@ fn simplified_dubins_path(theta: f64, distance: f64) -> f64 {
     let straight_length = (distance * distance - tussen_calc * tussen_calc).sqrt();
 
     arc_length + straight_length
+}
+
+fn heading_difference(heading1: f64, heading2: f64) -> f64 {
+    let diff = (heading1 - heading2).abs();
+    if diff > 180.0 {
+        360.0 - diff
+    } else {
+        diff
+    }
 }

@@ -38,7 +38,7 @@ fn round_height(value: f64) -> f64 {
 
 fn round_heading(value: f64) -> f64 {
     // 45 degrees resolution
-    (value / 45.0).round() * 45.0
+    (value / 11.25).round() * 11.25
 }
 
 impl Eq for Node {}

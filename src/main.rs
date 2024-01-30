@@ -78,8 +78,8 @@ struct AppPickListTime {
 
 struct AppPositionInfo {
     drone_position: geo::Point,
-    take_off_waypoints: Vec<geo::Point>,
-    landing_waypoints: Vec<geo::Point>,
+    // take_off_waypoints: Vec<geo::Point>,
+    // landing_waypoints: Vec<geo::Point>,
     goal_position: geo::Point,
     optimal_path: Vec<geo::Point>,
 }
@@ -137,10 +137,10 @@ impl Sandbox for MavlinkPlanGenerator {
         };
 
         let geo_info = AppPositionInfo {
-            drone_position: geo::Point::new(52.2825397, 6.8984103),
-            goal_position: geo::Point::new(52.2738255, 6.8779212),
-            take_off_waypoints: Vec::new(),
-            landing_waypoints: Vec::new(),
+            drone_position: geo::Point::new(52.282538406253, 6.898364382855505),
+            goal_position: geo::Point::new(52.2878797, 6.8706270),
+            // take_off_waypoints: Vec::new(),
+            // landing_waypoints: Vec::new(),
             optimal_path: Vec::new(),
         };
 
@@ -216,21 +216,28 @@ impl Sandbox for MavlinkPlanGenerator {
                 }
             }
             Message::PlanRoute => {
-                println!("PlanRoute pressed");
                 let start_position = geo::Point::new(52.2825397, 6.8984103);
                 let start_heading = 80.0;
-                let mut test_a_star_planner = astar_planner::AStarPlanner::new(
+                let test_a_star_planner = astar_planner::AStarPlanner::new(
                     start_position,
                     start_heading,
                     self.position_info.goal_position,
-                )
-                .unwrap();
-                let start = Instant::now();
-                test_a_star_planner.calculate_path();
-                let duration = start.elapsed();
-                self.position_info.optimal_path = test_a_star_planner.get_optimal_path();
-                // self.optimal_path = test_a_star_planner.get_all_points();
-                println!("Route geplanned in {:.1?}.", duration);
+                );
+
+                match test_a_star_planner {
+                    Ok(mut a_star_planner) => {
+                        let start = Instant::now();
+                        a_star_planner.calculate_path();
+                        let duration = start.elapsed();
+                        self.position_info.optimal_path = a_star_planner.get_optimal_path();
+                        // self.position_info.optimal_path = a_star_planner.get_all_points();
+                        println!("Route geplanned in {:.1?}.", duration);
+                    }
+                    Err(message) => {
+                        self.pop_up.text = message + ". Pas deze waarde aan, aub.";
+                        self.pop_up.show = true;
+                    }
+                }
             }
             Message::UpdateWeatherInfo => {
                 let response = reqwest::blocking::get("https://api.open-meteo.com/v1/forecast?latitude=52.29&longitude=6.9&hourly=winddirection_10m,winddirection_80m,winddirection_120m");
@@ -254,8 +261,10 @@ impl Sandbox for MavlinkPlanGenerator {
                                 .insert(weather_info.hourly.time[i].clone(), wind_data);
                         }
                         self.pick_list_time.time_options = weather_info.hourly.time.clone();
-                        self.pick_list_time.selected_time =
-                            Some(self.pick_list_time.time_options[0].clone());
+                        if self.pick_list_time.selected_time.is_none() {
+                            self.pick_list_time.selected_time =
+                                Some(self.pick_list_time.time_options[0].clone());
+                        }
                         self.weather_info.weather_data = Some(weather_info);
                         self.weather_info.wind_data = WindData {
                             direction_10m: self
@@ -317,26 +326,26 @@ impl Sandbox for MavlinkPlanGenerator {
             &self.position_info.drone_position.x().to_string(),
         )
         .on_input(Message::InputDroneLongitudeChanged)
-        .width(Length::Fixed(150.0));
+        .width(Length::Fixed(125.0));
         let drone_latitude = TextInput::new(
             "Latitude ",
             &self.position_info.drone_position.y().to_string(),
         )
         .on_input(Message::InputDroneLatitudeChanged)
-        .width(Length::Fixed(150.0));
+        .width(Length::Fixed(125.0));
 
         let input_longitude = TextInput::new(
             "Longitude",
             &self.position_info.goal_position.x().to_string(),
         )
         .on_input(Message::InputGoalLongitudeChanged)
-        .width(Length::Fixed(150.0));
+        .width(Length::Fixed(125.0));
         let input_latitude = TextInput::new(
             "Latitude ",
             &self.position_info.goal_position.y().to_string(),
         )
         .on_input(Message::InputGoalLatitudeChanged)
-        .width(Length::Fixed(150.0));
+        .width(Length::Fixed(125.0));
 
         let picklist = pick_list(
             &self.pick_list_time.time_options,
@@ -346,18 +355,24 @@ impl Sandbox for MavlinkPlanGenerator {
         .placeholder("Kies een tijd...");
 
         let left_column = column![
-            vertical_space(60),
+            vertical_space(20),
             start_location_text,
-            row!["Longitude:", drone_longitude].align_items(Alignment::Center),
-            row!["Latitude: ", drone_latitude].align_items(Alignment::Center),
+            row![
+                column!["Longitude:", vertical_space(10), "Latitude:"].align_items(Alignment::End),
+                column![drone_longitude, drone_latitude]
+            ]
+            .align_items(Alignment::Center),
             vertical_space(30),
             text(format!("Doel")).size(25),
-            row!["Longitude:", input_longitude].align_items(Alignment::Center),
-            row!["Latitude: ", input_latitude].align_items(Alignment::Center),
+            row![
+                column!["Longitude:", vertical_space(10), "Latitude: "].align_items(Alignment::End),
+                column![input_longitude, input_latitude]
+            ]
+            .align_items(Alignment::Center),
             vertical_space(30),
             text(format!("Wanneer wil je vliegen?")).size(25),
             picklist,
-            vertical_space(600),
+            vertical_space(20),
         ]
         .width(Length::Fill)
         .align_items(Alignment::Center)
@@ -405,13 +420,13 @@ impl Sandbox for MavlinkPlanGenerator {
         let button_weather = Button::new("Update").on_press(Message::UpdateWeatherInfo);
 
         let middle_column = column![
-            vertical_space(60),
+            vertical_space(20),
             text(format!("Windrichting")).size(25),
             wind_direction_10,
             wind_direction_80,
             wind_direction_120,
             button_weather,
-            vertical_space(600)
+            vertical_space(20)
         ]
         .width(Length::Fill)
         .align_items(Alignment::Center)
@@ -421,25 +436,22 @@ impl Sandbox for MavlinkPlanGenerator {
         let button_astar_test = Button::new("Plan Route").on_press(Message::PlanRoute);
 
         let right_column = column![
-            vertical_space(60),
+            vertical_space(20),
             text(format!("Vluchtplan")).size(25),
             button_astar_test,
             button_save,
-            vertical_space(600)
+            vertical_space(20)
         ]
         .width(Length::Fill)
         .align_items(Alignment::Center)
         .spacing(10);
 
-        let main_content = row![left_column, middle_column, right_column]
-            .align_items(Alignment::Start)
-            .spacing(20);
+        let main_content =
+            row![left_column, middle_column, right_column].align_items(Alignment::Start);
 
         let main_container: Container<'_, Message> = container(scrollable(main_content))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x()
-            .center_y()
+            .width(Length::Shrink)
+            .height(Length::Shrink)
             .into();
 
         let mut popup_content = Column::new().push(main_container);
