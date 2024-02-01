@@ -148,20 +148,95 @@ impl Default for MavLinkPlan {
                 [52.281442698183156, 6.8598604985957365],
             ],
         };
-        let geo_fence_polygon_spoorlijn = GeoFencePolygon {
-            inclusion: false,
-            version: 1,
-            polygon: vec![
-                [52.28397132247375, 6.863886719371692],
-                [52.2911115585158, 6.8829664192158475],
-                [52.29095744346746, 6.883631641810979],
-                [52.28354519237769, 6.863920220780301],
-            ],
-        };
+        // let geo_fence_polygon_spoorlijn = GeoFencePolygon {
+        //     inclusion: false,
+        //     version: 1,
+        //     polygon: vec![
+        //         [52.28397132247375, 6.863886719371692],
+        //         [52.2911115585158, 6.8829664192158475],
+        //         [52.29095744346746, 6.88363164version:1810979],
+        //         [52.28354519237769, 6.863920220780301],
+        //     ],
+        // };
+        // let geo_fence_polygon_spoorlijn_1 = GeoFencePolygon {
+        //     inclusion: false,
+        //     version: 1,
+        //     polygon: vec![
+        //         [52.28397132247375, 6.863886719371692],
+        //         [52.287510968119605, 6.8733916286129215],
+        //         [52.28729986661546, 6.8737774312500335],
+        //         [52.28354519237769, 6.863920220780301],
+        //     ],
+        // };
+        // let geo_fence_polygon_spoorlijn_2 = GeoFencePolygon {
+        //     inclusion: false,
+        //     version: 1,
+        //     polygon: vec![
+        //         [52.288720670228805, 6.876414304674057],
+        //         [52.29175801033167, 6.884476228939008],
+        //         [52.291441047529446, 6.885057644180449],
+        //         [52.288457999488145, 6.876892999221496],
+        //     ],
+        // };
+        let geo_fence_circle = vec![
+            GeoFenceCircle {
+                circle: Circle {
+                    center: [52.283105290274484, 6.861985238490377],
+                    radius: 100.0,
+                },
+                inclusion: false,
+                version: 1,
+            },
+            GeoFenceCircle {
+                circle: Circle {
+                    center: [52.28466271451338, 6.866473775137109],
+                    radius: 100.0,
+                },
+                inclusion: false,
+                version: 1,
+            },
+            GeoFenceCircle {
+                circle: Circle {
+                    center: [52.28644826062613, 6.871032565740023],
+                    radius: 100.0,
+                },
+                inclusion: false,
+                version: 1,
+            },
+            GeoFenceCircle {
+                circle: Circle {
+                    center: [52.288131372606706, 6.875354239578542],
+                    radius: 100.0,
+                },
+                inclusion: false,
+                version: 1,
+            },
+            GeoFenceCircle {
+                circle: Circle {
+                    center: [52.28968817161486, 6.8797506782361495],
+                    radius: 100.0,
+                },
+                inclusion: false,
+                version: 1,
+            },
+            GeoFenceCircle {
+                circle: Circle {
+                    center: [52.29148311807836, 6.8843410345191955],
+                    radius: 100.0,
+                },
+                inclusion: false,
+                version: 1,
+            },
+        ];
 
         let geo_fence = GeoFence {
-            circles: vec![],
-            polygons: vec![geo_fence_polygon_grens, geo_fence_polygon_spoorlijn],
+            circles: geo_fence_circle,
+            polygons: vec![
+                geo_fence_polygon_grens,
+                // geo_fence_polygon_spoorlijn_1,
+                // geo_fence_polygon_spoorlijn_2,
+                // geo_fence_polygon_spoorlijn,
+            ],
             version: 2,
         };
 

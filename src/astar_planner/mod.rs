@@ -28,7 +28,8 @@ pub struct AStarPlanner {
     closed_set: HashMap<GeospatialPose, Rc<Node>>,
     goal_pose: GeospatialPose,
     optimal_path: Vec<Rc<Node>>,
-    geo_fences: geo::MultiLineString,
+    geo_fences_polygon: geo::MultiLineString,
+    geo_fences_circles: Vec<geo::Point>,
 }
 
 impl AStarPlanner {
@@ -70,7 +71,7 @@ impl AStarPlanner {
             geo::coord! {x:52.28295542244744, y: 6.8565871319299845},
         ]);
 
-        let geo_fence_border_polygon = geo::Polygon::new(geo_fence_border.clone(),vec![]);
+        let geo_fence_border_polygon = geo::Polygon::new(geo_fence_border.clone(), vec![]);
         // The start and goal position should be inside the geo_fence
         if !geo_fence_border_polygon.contains(&start_pose.position) {
             return Err(String::from("Ongeldige drone positie."));
@@ -79,21 +80,57 @@ impl AStarPlanner {
             return Err(String::from("Ongeldige doel positie."));
         }
 
-        let geo_fence_railway = geo::LineString::new(vec![
-            geo::coord! {x:52.28397132247375, y: 6.863886719371692},
-            geo::coord! {x:52.2911115585158, y: 6.8829664192158475},
-            geo::coord! {x:52.29095744346746, y: 6.883631641810979},
-            geo::coord! {x:52.28354519237769, y: 6.863920220780301},
-            // repeat first point to close the loop
-            geo::coord! {x:52.28397132247375, y: 6.863886719371692},
-        ]);
+        // let geo_fence_railway = geo::LineString::new(vec![
+        //     geo::coord! {x:52.28397132247375, y: 6.863886719371692},
+        //     geo::coord! {x:52.2911115585158, y: 6.8829664192158475},
+        //     geo::coord! {x:52.29095744346746, y: 6.883631641810979},
+        //     geo::coord! {x:52.28354519237769, y: 6.863920220780301},
+        //     // repeat first point to close the loop
+        //     geo::coord! {x:52.28397132247375, y: 6.863886719371692},
+        // ]);
+        // let geo_fence_railway_1 = geo::LineString::new(vec![
+        //     geo::coord!{x:52.28397132247375, y: 6.863886719371692},
+        //     geo::coord!{x:52.287510968119605, y: 6.8733916286129215},
+        //     geo::coord!{x:52.28729986661546, y: 6.8737774312500335},
+        //     geo::coord!{x:52.28354519237769, y: 6.863920220780301},
+        //     geo::coord!{x:52.28397132247375, y: 6.863886719371692},
+        // ]);
+        // let geo_fence_railway_2 = geo::LineString::new(vec![
+        //     geo::coord!{x:52.288720670228805, y: 6.876414304674057},
+        //     geo::coord!{x:52.29175801033167, y: 6.884476228939008},
+        //     geo::coord!{x:52.291441047529446, y: 6.885057644180449},
+        //     geo::coord!{x:52.288457999488145, y: 6.876892999221496},
+        //     geo::coord!{x:52.288720670228805, y: 6.876414304674057},
+        // ]);
+
+        let mut geo_fence_circle: Vec<geo::Point> = Vec::new();
+        // 5 circles on railway
+        // geo_fence_circle.push(geo::Point::new(52.28342150438976, 6.862740698960664));
+        // geo_fence_circle.push(geo::Point::new(52.28517350285496, 6.867905173957723));
+        // geo_fence_circle.push(geo::Point::new(52.28717792705092, 6.87317966396094));
+        // geo_fence_circle.push(geo::Point::new(52.289274467917615, 6.878535125811709));
+        // geo_fence_circle.push(geo::Point::new(52.29119602537627, 6.883766547104244));
+        // 6 circles on railway
+        geo_fence_circle.push(geo::Point::new(52.283105290274484, 6.861985238490377));
+        geo_fence_circle.push(geo::Point::new(52.28466271451338, 6.866473775137109));
+        geo_fence_circle.push(geo::Point::new(52.28644826062613, 6.871032565740023));
+        geo_fence_circle.push(geo::Point::new(52.288131372606706, 6.875354239578542));
+        geo_fence_circle.push(geo::Point::new(52.28968817161486, 6.8797506782361495));
+        geo_fence_circle.push(geo::Point::new(52.29148311807836, 6.8843410345191955));
 
         let mut a_star_planner = AStarPlanner {
             open_set: BinaryHeap::new(),
             closed_set: HashMap::new(),
             goal_pose: goal_pose,
             optimal_path: Vec::new(),
-            geo_fences: geo::MultiLineString::new(vec![geo_fence_border, geo_fence_railway]),
+            geo_fences_polygon: geo::MultiLineString::new(vec![
+                geo_fence_border,
+                // geo_fence_railway_1,
+                // geo_fence_railway_2,
+                // geo_fence_railway,
+            ]),
+            geo_fences_circles: geo_fence_circle,
+            // geo_fences_circles: vec![],
         };
 
         let cost_to_goal = calculate_h(&start_pose, &goal_pose);
@@ -131,8 +168,11 @@ impl AStarPlanner {
             // Check validity of new positions
             // Check if new position are in Closed Set (already treated)
             next_poses.retain(|&pose| {
-                pose.is_valid(&parent.pose, &self.geo_fences)
-                    && !self.closed_set.contains_key(&pose)
+                pose.is_valid(
+                    &parent.pose,
+                    &self.geo_fences_polygon,
+                    &self.geo_fences_circles,
+                ) && !self.closed_set.contains_key(&pose)
             });
 
             // Calculate node information of new position
@@ -228,7 +268,7 @@ impl AStarPlanner {
     //         let p_last = geo_fence_polygon.polygon[geo_fence_polygon.polygon.len() - 1];
     //         for test in geo_fence_polygon.polygon.iter() {
 
-    //             self.geo_fences.push(lin)
+    //             self.geo_fences_polygon.push(lin)
     //         }
     //     }
     // }
@@ -306,15 +346,25 @@ impl GeospatialPose {
         new_heading
     }
 
-    fn is_valid(&self, parent_pose: &GeospatialPose, geo_fence: &geo::MultiLineString) -> bool {
+    fn is_valid(
+        &self,
+        parent_pose: &GeospatialPose,
+        geo_fence_polygon: &geo::MultiLineString,
+        geo_fence_circle: &Vec<geo::Point>,
+    ) -> bool {
         let drone_path = geo::Line::new(
             geo::coord! {x:parent_pose.position.x(), y:parent_pose.position.y()},
             geo::coord! {x:self.position.x(), y:self.position.y()},
         );
 
-        if geo_fence.intersects(&drone_path) {
+        if geo_fence_polygon.intersects(&drone_path) {
             false
         } else {
+            for point in geo_fence_circle.iter() {
+                if circle_line_intersect(&point, 100.0, &drone_path) {
+                    return false;
+                }
+            }
             true
         }
     }
@@ -346,9 +396,7 @@ fn calculate_g(child_pose: &GeospatialPose, parent_node: &Node, distance_increme
     // parent_node.g + distance_increment
     let steering_weight = 4.0;
     let steering = heading_difference(child_pose.heading, parent_node.pose.heading);
-    parent_node.g
-        + distance_increment
-        + steering_weight * steering * steering
+    parent_node.g + distance_increment + steering_weight * steering * steering
 }
 
 /// Calculate cost to goal
@@ -422,4 +470,48 @@ fn heading_difference(heading1: f64, heading2: f64) -> f64 {
     } else {
         diff
     }
+}
+
+/// Checks if a circle and a line (starting from (0,0) and ending at line.end) intersect.
+/// 
+/// # Arguments
+/// * `circle_center` - The center of the circle as a geo::Point<f64>.
+/// * `radius` - The radius of the circle as an f64.
+/// * `line` - The line as a geo::Line<f64>.
+///
+/// # Returns
+/// True if the line segment intersects the circle, false otherwise.
+fn circle_line_intersect(circle_center: &geo::Point<f64>, radius: f64, line: &geo::Line<f64>) -> bool {
+    let (x1, y1) = transform_geo_to_cartesian_coordinates(&circle_center, &line.start.into());
+    let (x2, y2) = transform_geo_to_cartesian_coordinates(&circle_center, &line.end.into());
+    
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+
+    // Coefficients for the quadratic equation Ax^2 + Bx + C = 0
+    let a = dx.powi(2) + dy.powi(2);
+    let b = 2.0 * (x1 * dx + y1 * dy);
+    let c = x1.powi(2) + y1.powi(2) - radius.powi(2);
+
+    // Discriminant
+    let discriminant = b.powi(2) - 4.0 * a * c;
+
+    if discriminant < 0.0 {
+        // No real solutions, the line does not intersect the circle
+        return false;
+    }
+
+    // Calculate the t values for potential intersection points
+    let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
+    let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
+
+    // Check if either t value is within the line segment (0 <= t <= 1)
+    (t1 >= 0.0 && t1 <= 1.0) || (t2 >= 0.0 && t2 <= 1.0)
+}
+
+fn transform_geo_to_cartesian_coordinates(origin: &geo::Point<f64>, other_point: &geo::Point<f64>) -> (f64, f64) {
+    let geod = Geodesic::wgs84();
+    let (s12, az1, _, _) = geod.inverse(origin.x(), origin.y(), other_point.x(), other_point.y());
+
+    (s12*az1.sin(), s12*az1.cos())
 }

@@ -326,26 +326,26 @@ impl Sandbox for MavlinkPlanGenerator {
             &self.position_info.drone_position.x().to_string(),
         )
         .on_input(Message::InputDroneLongitudeChanged)
-        .width(Length::Fixed(125.0));
+        .width(Length::Fixed(190.0));
         let drone_latitude = TextInput::new(
             "Latitude ",
             &self.position_info.drone_position.y().to_string(),
         )
         .on_input(Message::InputDroneLatitudeChanged)
-        .width(Length::Fixed(125.0));
+        .width(Length::Fixed(190.0));
 
         let input_longitude = TextInput::new(
             "Longitude",
             &self.position_info.goal_position.x().to_string(),
         )
         .on_input(Message::InputGoalLongitudeChanged)
-        .width(Length::Fixed(125.0));
+        .width(Length::Fixed(190.0));
         let input_latitude = TextInput::new(
             "Latitude ",
             &self.position_info.goal_position.y().to_string(),
         )
         .on_input(Message::InputGoalLatitudeChanged)
-        .width(Length::Fixed(125.0));
+        .width(Length::Fixed(190.0));
 
         let picklist = pick_list(
             &self.pick_list_time.time_options,
