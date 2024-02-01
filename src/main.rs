@@ -217,19 +217,23 @@ impl Sandbox for MavlinkPlanGenerator {
             }
             Message::PlanRoute => {
                 let start_position = geo::Point::new(52.2825397, 6.8984103);
-                let start_heading = 80.0;
+                let start_heading = 0.0;
+                let end_position = geo::Point::new(52.2825397, 6.8984103);
+                let end_heading = 0.0;
                 let test_a_star_planner = astar_planner::AStarPlanner::new(
                     start_position,
                     start_heading,
                     self.position_info.goal_position,
+                    end_position,
+                    end_heading,
                 );
 
                 match test_a_star_planner {
                     Ok(mut a_star_planner) => {
                         let start = Instant::now();
-                        a_star_planner.calculate_path();
+                        self.position_info.optimal_path = a_star_planner.get_optimal_path_to_goal();
+                        self.position_info.optimal_path.append(&mut a_star_planner.get_optimal_path_from_goal());
                         let duration = start.elapsed();
-                        self.position_info.optimal_path = a_star_planner.get_optimal_path();
                         // self.position_info.optimal_path = a_star_planner.get_all_points();
                         println!("Route geplanned in {:.1?}.", duration);
                     }
