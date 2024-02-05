@@ -7,8 +7,6 @@
 
 //! A* path planner
 
-// use crate::mav_link_plan;
-
 use dubins_paths::{DubinsPath, PosRot};
 use geo;
 use geo::algorithm::intersects::Intersects;
@@ -24,29 +22,50 @@ use planning_waypoints::{GeospatialPose, Node};
 
 /// Data for open set, closed set, goal pose, and optimal path for the A* planner.
 pub struct AStarPlanner {
-    open_set: BinaryHeap<Rc<Node>>,
-    closed_set: HashMap<GeospatialPose, Rc<Node>>,
-    goal_pose: GeospatialPose,
-    optimal_path: Vec<Rc<Node>>,
+    // open_set: BinaryHeap<Rc<Node>>,
+    // closed_set: HashMap<GeospatialPose, Rc<Node>>,
+    start_pose: GeospatialPose, // Waypoint where take off sequence ends
+    goal_pose: GeospatialPose,  // Where do you want to fly
+    end_pose: GeospatialPose,   // Waypoint where landing sequence starts
+    optimal_path_from_start_to_goal: Vec<Rc<Node>>,
+    optimal_path_from_goal_to_end: Vec<Rc<Node>>,
     geo_fences_polygon: geo::MultiLineString,
     geo_fences_circles: Vec<geo::Point>,
 }
 
 impl AStarPlanner {
+    /// Builds A* Planner struct
+    ///
+    /// # Arguments
+    /// * `start_location` - Longitude and latitude of point where take off sequence ends as a geo::Point<f64>.
+    /// * `start_heading` - Heading of point where take off sequence ends as an f64.
+    /// * `goal_location` - Longitude and latitude of point where you want to go.
+    /// * `end_location` - Longitude and latitude of point where landing sequence starts as a geo::Point<f64>.
+    /// * `end_heading` - Heading of point where landing sequence starts as an f64.
+    ///
+    /// # Returns
+    /// AStarPlanner struct in a Result<>.
     pub fn new(
-        start_point: geo::Point,
+        start_location: geo::Point,
         start_heading: f64,
-        end_point: geo::Point,
+        goal_location: geo::Point,
+        end_location: geo::Point,
+        end_heading: f64,
     ) -> Result<Self, String> {
         let start_pose = GeospatialPose {
-            position: start_point,
+            position: start_location,
             height: 120.0,
             heading: start_heading,
         };
         let goal_pose = GeospatialPose {
-            position: end_point,
+            position: goal_location,
             height: 120.0,
             heading: 0.0,
+        };
+        let end_pose = GeospatialPose {
+            position: end_location,
+            height: 120.0,
+            heading: end_heading,
         };
 
         let geo_fence_border = geo::LineString::new(vec![
@@ -118,11 +137,14 @@ impl AStarPlanner {
         geo_fence_circle.push(geo::Point::new(52.28968817161486, 6.8797506782361495));
         geo_fence_circle.push(geo::Point::new(52.29148311807836, 6.8843410345191955));
 
-        let mut a_star_planner = AStarPlanner {
-            open_set: BinaryHeap::new(),
-            closed_set: HashMap::new(),
+        let a_star_planner = AStarPlanner {
+            // open_set: BinaryHeap::new(),
+            // closed_set: HashMap::new(),
+            start_pose: start_pose,
             goal_pose: goal_pose,
-            optimal_path: Vec::new(),
+            end_pose: end_pose,
+            optimal_path_from_start_to_goal: Vec::new(),
+            optimal_path_from_goal_to_end: Vec::new(),
             geo_fences_polygon: geo::MultiLineString::new(vec![
                 geo_fence_border,
                 // geo_fence_railway_1,
@@ -133,10 +155,23 @@ impl AStarPlanner {
             // geo_fences_circles: vec![],
         };
 
-        let cost_to_goal = calculate_h(&start_pose, &goal_pose);
+        Ok(a_star_planner)
+    }
 
-        let start_node_rc = Rc::new(planning_waypoints::Node {
-            pose: start_pose,
+    fn calculate_path(
+        &self,
+        begin_pose: &GeospatialPose,
+        end_pose: &GeospatialPose,
+    ) -> Vec<Rc<Node>> {
+        let geod = Geodesic::wgs84();
+        let mut open_set: BinaryHeap<Rc<Node>> = BinaryHeap::new();
+        let mut closed_set: HashMap<GeospatialPose, Rc<Node>> = HashMap::new();
+        let mut optimal_path = Vec::new();
+        let distance_increment = 210.0;
+
+        let cost_to_goal = calculate_h(begin_pose, end_pose);
+        let begin_node = Rc::new(planning_waypoints::Node {
+            pose: begin_pose.clone(),
             traveled_distance: 0.0,
             steering: 0.0,
             steering_integral: 0.0,
@@ -146,22 +181,13 @@ impl AStarPlanner {
             parent: None,
         });
 
-        a_star_planner.open_set.push(start_node_rc);
-
-        Ok(a_star_planner)
-    }
-
-    pub fn calculate_path(&mut self) {
-        self.optimal_path.clear();
-        let geod = Geodesic::wgs84();
-
-        let distance_increment = 140.0;
+        open_set.push(begin_node);
 
         let mut path_not_found: bool = true;
-        let mut point_in_reach_of_goal: BinaryHeap<Rc<Node>> = BinaryHeap::new();
+        let mut points_in_reach_of_goal: BinaryHeap<Rc<Node>> = BinaryHeap::new();
         while path_not_found {
             // Pull top position from Open Set
-            let parent = self.open_set.pop().unwrap();
+            let parent = open_set.pop().unwrap();
 
             // calculate new positions
             let mut next_poses = parent.pose.calculate_next_poses(distance_increment);
@@ -172,7 +198,7 @@ impl AStarPlanner {
                     &parent.pose,
                     &self.geo_fences_polygon,
                     &self.geo_fences_circles,
-                ) && !self.closed_set.contains_key(&pose)
+                ) && !closed_set.contains_key(&pose)
             });
 
             // Calculate node information of new position
@@ -180,104 +206,97 @@ impl AStarPlanner {
                 let steering = pose.heading - parent.pose.heading;
                 let steering_integral = parent.steering_integral + steering.abs();
 
-                let cost_so_far = calculate_g(&pose, &parent, distance_increment);
-                let cost_to_goal = calculate_h(&pose, &self.goal_pose);
+                let cost_so_far = parent.g + calculate_delta_g(&pose, &parent, distance_increment);
+                let cost_to_goal = calculate_h(&pose, end_pose);
 
                 let node = Rc::new(Node {
-                    pose: pose.clone(),
+                    pose: *pose,
                     traveled_distance: parent.traveled_distance + distance_increment,
                     steering: steering,
                     steering_integral: steering_integral,
                     g: cost_so_far,
                     h: cost_to_goal,
-                    f: cost_so_far + cost_to_goal,
+                    f: cost_so_far + cost_to_goal + 0.0001 * steering_integral*steering_integral,
                     parent: Some(Rc::clone(&parent)),
                 });
 
                 // Check if new positions is goal
                 let (distance, _, _, _) = geod.inverse(
-                    pose.position.x(),
-                    pose.position.y(),
-                    self.goal_pose.position.x(),
-                    self.goal_pose.position.y(),
-                );
+                    node.pose.position.x(),
+                    node.pose.position.y(),
+                    end_pose.position.x(),
+                    end_pose.position.y(),
+                ); 
                 if distance < distance_increment {
                     path_not_found = false;
-                    point_in_reach_of_goal.push(Rc::clone(&node));
-                    self.closed_set.insert(node.pose, node);
+                    points_in_reach_of_goal.push(Rc::clone(&node));
+                    closed_set.insert(node.pose, node);
                 } else {
                     // Push new positions to Open Set
-                    self.open_set.push(node);
+                    open_set.push(node);
                 }
             }
 
             // Push top position to Closed Set
-            self.closed_set.insert(parent.pose, parent);
+            closed_set.insert(parent.pose, parent);
         }
-        self.optimal_path
-            .push(Rc::clone(&point_in_reach_of_goal.pop().unwrap()));
+        optimal_path.push(Rc::clone(&points_in_reach_of_goal.pop().unwrap()));
 
         // Fill the vector with waypoints from goal pose to start pose.
         loop {
-            let node = self
-                .closed_set
-                .get(&self.optimal_path[self.optimal_path.len() - 1].pose)
+            let node = closed_set
+                .get(&optimal_path[optimal_path.len() - 1].pose)
                 .unwrap();
             match &node.parent {
-                Some(value) => self.optimal_path.push(Rc::clone(&value)),
+                Some(value) => optimal_path.push(Rc::clone(&value)),
                 None => break,
             }
         }
-    }
-
-    pub fn get_optimal_path(&self) -> Vec<geo::Point> {
-        let mut optimal_path: Vec<geo::Point> = Vec::new();
-
-        for point in self.optimal_path.iter().rev() {
-            optimal_path.push(point.pose.position);
-        }
-
-        optimal_path.push(self.goal_pose.position);
-
-        println!(
-            "# waypoints: {} | # closed set {} | # open set {}",
-            optimal_path.len(),
-            self.closed_set.len(),
-            self.open_set.len()
-        );
 
         optimal_path
     }
 
-    pub fn get_all_points(&self) -> Vec<geo::Point> {
-        let mut all_points: Vec<geo::Point> = Vec::new();
+    pub fn get_optimal_path_to_goal(&mut self) -> Vec<geo::Point> {
+        self.optimal_path_from_start_to_goal =
+            self.calculate_path(&self.start_pose, &self.goal_pose);
 
-        for node in self.closed_set.values() {
-            all_points.push(node.pose.position);
+        let mut optimal_path_from_start_to_goal: Vec<geo::Point> = Vec::new();
+
+        if self.optimal_path_from_start_to_goal.len() > 2 {
+            for point in self.optimal_path_from_start_to_goal
+                [1..]
+                .iter()
+                .rev()
+            {
+                optimal_path_from_start_to_goal.push(point.pose.position);
+            }
         }
 
-        // for node in self.open_set.iter() {
-        //     all_points.push(node.pose.position);
-        // }
-
-        all_points
+        optimal_path_from_start_to_goal
     }
 
-    // pub fn fill_geofence(&self, geo_fence: &mav_link_plan::GeoFence) {
-    //     for geo_fence_polygon in geo_fence.polygons.iter() {
-    //         let p_last = geo_fence_polygon.polygon[geo_fence_polygon.polygon.len() - 1];
-    //         for test in geo_fence_polygon.polygon.iter() {
+    pub fn get_optimal_path_from_goal(&mut self) -> Vec<geo::Point> {
+        let mut node_inverse_heading = self.end_pose.clone();
+        node_inverse_heading.heading += 180.0;
+        self.optimal_path_from_goal_to_end =
+            self.calculate_path(&node_inverse_heading, &self.goal_pose);
 
-    //             self.geo_fences_polygon.push(lin)
-    //         }
-    //     }
-    // }
+        let mut optimal_path_from_goal_to_end: Vec<geo::Point> = Vec::new();
+
+        for point in self.optimal_path_from_goal_to_end.iter() {
+            optimal_path_from_goal_to_end.push(point.pose.position);
+        }
+
+        optimal_path_from_goal_to_end
+    }
 }
 
 impl GeospatialPose {
     fn calculate_next_poses(&self, distance_increment: f64) -> Vec<GeospatialPose> {
         let mut next_poses = Vec::new();
 
+        // turn 90 degree left
+        // next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
         // turn 45 degree left
         next_poses.push(self.calculate_next_pose(-45.0, distance_increment));
         // turn 22.5 degree left
@@ -292,6 +311,8 @@ impl GeospatialPose {
         next_poses.push(self.calculate_next_pose(22.5, distance_increment));
         // turn 45 degrees right
         next_poses.push(self.calculate_next_pose(45.0, distance_increment));
+        // turn 90 degrees right
+        // next_poses.push(self.calculate_next_pose(90.0, distance_increment));
 
         return next_poses;
     }
@@ -361,7 +382,7 @@ impl GeospatialPose {
             false
         } else {
             for point in geo_fence_circle.iter() {
-                if circle_line_intersect(&point, 100.0, &drone_path) {
+                if circle_line_intersect(&point, 140.0, &drone_path) {
                     return false;
                 }
             }
@@ -392,11 +413,13 @@ fn chord_length(arc_length: f64, angle_degrees: f64) -> f64 {
 }
 
 /// Calculate cost so far
-fn calculate_g(child_pose: &GeospatialPose, parent_node: &Node, distance_increment: f64) -> f64 {
-    // parent_node.g + distance_increment
-    let steering_weight = 4.0;
+fn calculate_delta_g(
+    child_pose: &GeospatialPose,
+    parent_node: &Node,
+    distance_increment: f64,
+) -> f64 {
     let steering = heading_difference(child_pose.heading, parent_node.pose.heading);
-    parent_node.g + distance_increment + steering_weight * steering * steering
+    cost_function(distance_increment, steering)
 }
 
 /// Calculate cost to goal
@@ -427,9 +450,7 @@ fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
         distance = shortest_path_possible.length() as f64;
     }
 
-    // distance
-    let steering_weight = 4.0;
-    distance + steering_weight * new_heading * new_heading
+    cost_function(distance, new_heading)
 }
 
 /// Calculate length of Dubins Path for Left Turn - Straight
@@ -473,7 +494,7 @@ fn heading_difference(heading1: f64, heading2: f64) -> f64 {
 }
 
 /// Checks if a circle and a line (starting from (0,0) and ending at line.end) intersect.
-/// 
+///
 /// # Arguments
 /// * `circle_center` - The center of the circle as a geo::Point<f64>.
 /// * `radius` - The radius of the circle as an f64.
@@ -481,20 +502,24 @@ fn heading_difference(heading1: f64, heading2: f64) -> f64 {
 ///
 /// # Returns
 /// True if the line segment intersects the circle, false otherwise.
-fn circle_line_intersect(circle_center: &geo::Point<f64>, radius: f64, line: &geo::Line<f64>) -> bool {
+fn circle_line_intersect(
+    circle_center: &geo::Point<f64>,
+    radius: f64,
+    line: &geo::Line<f64>,
+) -> bool {
     let (x1, y1) = transform_geo_to_cartesian_coordinates(&circle_center, &line.start.into());
     let (x2, y2) = transform_geo_to_cartesian_coordinates(&circle_center, &line.end.into());
-    
+
     let dx = x2 - x1;
     let dy = y2 - y1;
 
     // Coefficients for the quadratic equation Ax^2 + Bx + C = 0
-    let a = dx.powi(2) + dy.powi(2);
+    let a = dx * dx + dy * dy;
     let b = 2.0 * (x1 * dx + y1 * dy);
-    let c = x1.powi(2) + y1.powi(2) - radius.powi(2);
+    let c = x1 * x1 + y1 * y1 - radius * radius;
 
     // Discriminant
-    let discriminant = b.powi(2) - 4.0 * a * c;
+    let discriminant = b * b - 4.0 * a * c;
 
     if discriminant < 0.0 {
         // No real solutions, the line does not intersect the circle
@@ -509,9 +534,55 @@ fn circle_line_intersect(circle_center: &geo::Point<f64>, radius: f64, line: &ge
     (t1 >= 0.0 && t1 <= 1.0) || (t2 >= 0.0 && t2 <= 1.0)
 }
 
-fn transform_geo_to_cartesian_coordinates(origin: &geo::Point<f64>, other_point: &geo::Point<f64>) -> (f64, f64) {
+fn transform_geo_to_cartesian_coordinates(
+    origin: &geo::Point<f64>,
+    other_point: &geo::Point<f64>,
+) -> (f64, f64) {
     let geod = Geodesic::wgs84();
+
     let (s12, az1, _, _) = geod.inverse(origin.x(), origin.y(), other_point.x(), other_point.y());
 
-    (s12*az1.sin(), s12*az1.cos())
+    let az1_pi = az1 * (PI / 180.0);
+
+    (s12 * az1_pi.sin(), s12 * az1_pi.cos())
+}
+
+fn cost_function(distance: f64, steering: f64) -> f64 {
+    // // Minimize distance. Get's the shortest path possible. Downside is that it creates a lot of nodes because
+    // // all steering is allowed.
+    // // distance only
+    // distance
+
+    // Minimize distance plus steering. Steering is penalized on a per node basis.
+    // distance + steering
+    let steering_weight = 10.0;
+    distance + steering_weight * steering.abs()
+
+    // // Minimize distance plus steering squared. Steering is penalized squared on a per node basis. This means
+    // // that if we have to steer 90 degrees to get to our goal, taking a wide turn over multiple nodes if favored over
+    // // a tight turn.
+    // // distance + steering^2
+    // let steering_weight = 4.0;
+    // distance + steering_weight * steering * steering
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_heading_difference() {
+        assert_eq!(heading_difference(0.0, 270.0), 90.0);
+    }
+
+    #[test]
+    fn test_circle_line_intersect() {
+        let circle_center = geo::Point::new(52.288131372606706, 6.875354239578542);
+        let radius = 100.0;
+        let line = geo::Line::new(
+            geo::coord! {x:52.2880218, y:6.8769461},
+            geo::coord! {x:52.2883900, y:6.8739277},
+        );
+        assert_eq!(circle_line_intersect(&circle_center, radius, &line), true);
+    }
 }
