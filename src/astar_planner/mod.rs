@@ -216,7 +216,7 @@ impl AStarPlanner {
                     steering_integral: steering_integral,
                     g: cost_so_far,
                     h: cost_to_goal,
-                    f: cost_so_far + cost_to_goal, // + 0.0001 * steering_integral*steering_integral,
+                    f: cost_so_far + cost_to_goal + 0.0001 * steering_integral*steering_integral,
                     parent: Some(Rc::clone(&parent)),
                 });
 
@@ -226,7 +226,7 @@ impl AStarPlanner {
                     pose.position.y(),
                     end_pose.position.x(),
                     end_pose.position.y(),
-                );
+                ); 
                 if distance < distance_increment {
                     path_not_found = false;
                     points_in_reach_of_goal.push(Rc::clone(&node));
