@@ -16,6 +16,7 @@ use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::rc::Rc;
+use std::time::Instant;
 
 mod planning_waypoints;
 use planning_waypoints::{GeospatialPose, Node};
@@ -193,6 +194,7 @@ impl AStarPlanner {
             let mut next_poses = parent.pose.calculate_next_poses(distance_increment);
             // Check validity of new positions
             // Check if new position are in Closed Set (already treated)
+            let start = Instant::now();
             next_poses.retain(|&pose| {
                 pose.is_valid(
                     &parent.pose,
@@ -200,6 +202,7 @@ impl AStarPlanner {
                     &self.geo_fences_circles,
                 ) && !closed_set.contains_key(&pose)
             });
+            let duration1 = start.elapsed();
 
             // Calculate node information of new position
             for pose in next_poses.iter() {
@@ -236,6 +239,8 @@ impl AStarPlanner {
                     open_set.push(node);
                 }
             }
+            let duration2 = start.elapsed();
+            println!("is valid {:?}, pose calc {:?}", duration1, duration2);
 
             // Push top position to Closed Set
             closed_set.insert(parent.pose, parent);
