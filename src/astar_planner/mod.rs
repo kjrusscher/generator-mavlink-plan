@@ -210,7 +210,7 @@ impl AStarPlanner {
                 let cost_to_goal = calculate_h(&pose, end_pose);
 
                 let node = Rc::new(Node {
-                    pose: pose.clone(),
+                    pose: *pose,
                     traveled_distance: parent.traveled_distance + distance_increment,
                     steering: steering,
                     steering_integral: steering_integral,
@@ -222,8 +222,8 @@ impl AStarPlanner {
 
                 // Check if new positions is goal
                 let (distance, _, _, _) = geod.inverse(
-                    pose.position.x(),
-                    pose.position.y(),
+                    node.pose.position.x(),
+                    node.pose.position.y(),
                     end_pose.position.x(),
                     end_pose.position.y(),
                 ); 
