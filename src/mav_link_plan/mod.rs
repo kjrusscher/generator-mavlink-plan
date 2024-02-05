@@ -182,7 +182,7 @@ impl Default for MavLinkPlan {
             GeoFenceCircle {
                 circle: Circle {
                     center: [52.283105290274484, 6.861985238490377],
-                    radius: 100.0,
+                    radius: 140.0,
                 },
                 inclusion: false,
                 version: 1,
@@ -190,7 +190,7 @@ impl Default for MavLinkPlan {
             GeoFenceCircle {
                 circle: Circle {
                     center: [52.28466271451338, 6.866473775137109],
-                    radius: 100.0,
+                    radius: 140.0,
                 },
                 inclusion: false,
                 version: 1,
@@ -198,7 +198,7 @@ impl Default for MavLinkPlan {
             GeoFenceCircle {
                 circle: Circle {
                     center: [52.28644826062613, 6.871032565740023],
-                    radius: 100.0,
+                    radius: 140.0,
                 },
                 inclusion: false,
                 version: 1,
@@ -206,7 +206,7 @@ impl Default for MavLinkPlan {
             GeoFenceCircle {
                 circle: Circle {
                     center: [52.288131372606706, 6.875354239578542],
-                    radius: 100.0,
+                    radius: 140.0,
                 },
                 inclusion: false,
                 version: 1,
@@ -214,7 +214,7 @@ impl Default for MavLinkPlan {
             GeoFenceCircle {
                 circle: Circle {
                     center: [52.28968817161486, 6.8797506782361495],
-                    radius: 100.0,
+                    radius: 140.0,
                 },
                 inclusion: false,
                 version: 1,
@@ -222,7 +222,7 @@ impl Default for MavLinkPlan {
             GeoFenceCircle {
                 circle: Circle {
                     center: [52.29148311807836, 6.8843410345191955],
-                    radius: 100.0,
+                    radius: 140.0,
                 },
                 inclusion: false,
                 version: 1,
@@ -266,7 +266,7 @@ impl Default for MavLinkPlan {
 }
 
 impl MavLinkPlan {
-    pub fn new(wind_direction_10m: i32, path: &Vec<geo::Point>) -> Self {
+    pub fn new(wind_direction_10m: i32) -> Self {
         let mut plan = MavLinkPlan::default();
 
         let direction_take_off = f64::from(wind_direction_10m);
@@ -275,28 +275,6 @@ impl MavLinkPlan {
         let home_position_drone = geo::Point::new(52.282538406253, 6.898364382855505);
 
         plan.add_take_off_sequence(direction_take_off, home_position_drone);
-
-        let number_of_waypoints = path.len();
-        for (index, point) in path.iter().enumerate() {
-            if index < (number_of_waypoints - 1) {
-                plan.add_waypoint(120, point.x(), point.y());
-            } else {
-                // Add loiter point.
-                plan.add_special_waypoint(
-                    Some(120),
-                    MavCmd::MAV_CMD_NAV_LOITER_UNLIM,
-                    [
-                        Some(0.0),
-                        Some(0.0),
-                        Some(140.0),
-                        None,
-                        Some(point.x()),
-                        Some(point.y()),
-                        Some(120.0),
-                    ],
-                );
-            }
-        }
 
         plan
     }
@@ -400,6 +378,29 @@ impl MavLinkPlan {
     //         ],
     //     );
     // }
+
+    pub fn add_path(&mut self, path: &Vec<geo::Point>) {
+        for point in path.iter() {
+            self.add_waypoint(120, point.x(), point.y());
+        }
+    }
+
+    /// Add goal position as loiter point.
+    pub fn add_goal_position(&mut self, goal: &geo::Point) {
+        self.add_special_waypoint(
+            Some(120),
+            MavCmd::MAV_CMD_NAV_LOITER_UNLIM,
+            [
+                Some(0.0),
+                Some(0.0),
+                Some(140.0),
+                None,
+                Some(goal.x()),
+                Some(goal.y()),
+                Some(120.0),
+            ],
+        );
+    }
 
     fn add_waypoint(&mut self, height: i32, latitude: f64, longitude: f64) {
         let mut waypoint = MavLinkSimpleItem::default();

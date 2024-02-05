@@ -262,11 +262,15 @@ impl AStarPlanner {
 
         let mut optimal_path_from_start_to_goal: Vec<geo::Point> = Vec::new();
 
-        for point in self.optimal_path_from_start_to_goal.iter().rev() {
-            optimal_path_from_start_to_goal.push(point.pose.position);
+        if self.optimal_path_from_start_to_goal.len() > 2 {
+            for point in self.optimal_path_from_start_to_goal
+                [1..]
+                .iter()
+                .rev()
+            {
+                optimal_path_from_start_to_goal.push(point.pose.position);
+            }
         }
-
-        optimal_path_from_start_to_goal.push(self.goal_pose.position);
 
         optimal_path_from_start_to_goal
     }
@@ -282,8 +286,6 @@ impl AStarPlanner {
         for point in self.optimal_path_from_goal_to_end.iter() {
             optimal_path_from_goal_to_end.push(point.pose.position);
         }
-
-        optimal_path_from_goal_to_end.push(self.end_pose.position);
 
         optimal_path_from_goal_to_end
     }
@@ -512,12 +514,12 @@ fn circle_line_intersect(
     let dy = y2 - y1;
 
     // Coefficients for the quadratic equation Ax^2 + Bx + C = 0
-    let a = dx*dx + dy*dy;
+    let a = dx * dx + dy * dy;
     let b = 2.0 * (x1 * dx + y1 * dy);
-    let c = x1*x1+ y1*y1 - radius*radius;
+    let c = x1 * x1 + y1 * y1 - radius * radius;
 
     // Discriminant
-    let discriminant = b*b - 4.0 * a * c;
+    let discriminant = b * b - 4.0 * a * c;
 
     if discriminant < 0.0 {
         // No real solutions, the line does not intersect the circle

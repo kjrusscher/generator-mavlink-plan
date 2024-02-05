@@ -81,7 +81,8 @@ struct AppPositionInfo {
     // take_off_waypoints: Vec<geo::Point>,
     // landing_waypoints: Vec<geo::Point>,
     goal_position: geo::Point,
-    optimal_path: Vec<geo::Point>,
+    optimal_path_from_take_off_to_goal: Vec<geo::Point>,
+    optimal_path_from_goal_to_landing: Vec<geo::Point>,
 }
 
 /// Stores state information for application
@@ -141,7 +142,8 @@ impl Sandbox for MavlinkPlanGenerator {
             goal_position: geo::Point::new(52.2878797, 6.8706270),
             // take_off_waypoints: Vec::new(),
             // landing_waypoints: Vec::new(),
-            optimal_path: Vec::new(),
+            optimal_path_from_take_off_to_goal: Vec::new(),
+            optimal_path_from_goal_to_landing: Vec::new(),
         };
 
         MavlinkPlanGenerator {
@@ -186,27 +188,17 @@ impl Sandbox for MavlinkPlanGenerator {
                 if self.pick_list_time.selected_time.is_none() {
                     self.pop_up.text = "Selecteer een tijd".to_string();
                     self.pop_up.show = true;
-                } else if self.position_info.optimal_path.len() == 0 {
+                } else if self.position_info.optimal_path_from_take_off_to_goal.len() == 0
+                    || self.position_info.optimal_path_from_goal_to_landing.len() == 0
+                {
                     self.pop_up.text = "Plan eerst een route".to_string();
                     self.pop_up.show = true;
                 } else {
-                    self.plan = Some(MavLinkPlan::new(
-                        self.weather_info.wind_data.direction_10m.unwrap(),
-                        &self.position_info.optimal_path,
-                    ));
-
                     let file_name = format!(
                         "vluchtplan_{}.plan",
                         self.pick_list_time.selected_time.as_ref().unwrap()
                     );
-
-                    // Create a file to save the formatted JSON
-                    let file = File::create(&file_name).expect("Failed to create file");
-                    let writer = BufWriter::new(file);
-
-                    // Serialize and format the data with newlines and indentation
-                    serde_json::to_writer_pretty(writer, &self.plan)
-                        .expect("Failed to write JSON data to file");
+                    self.save_plan_to_file(&file_name);
 
                     Notification::new()
                         .summary("Bestand Opgeslagen")
@@ -231,8 +223,10 @@ impl Sandbox for MavlinkPlanGenerator {
                 match test_a_star_planner {
                     Ok(mut a_star_planner) => {
                         let start = Instant::now();
-                        self.position_info.optimal_path = a_star_planner.get_optimal_path_to_goal();
-                        self.position_info.optimal_path.append(&mut a_star_planner.get_optimal_path_from_goal());
+                        self.position_info.optimal_path_from_take_off_to_goal =
+                            a_star_planner.get_optimal_path_to_goal();
+                        self.position_info.optimal_path_from_goal_to_landing =
+                            a_star_planner.get_optimal_path_from_goal();
                         let duration = start.elapsed();
                         // self.position_info.optimal_path = a_star_planner.get_all_points();
                         println!("Route geplanned in {:.1?}.", duration);
@@ -479,6 +473,28 @@ impl Sandbox for MavlinkPlanGenerator {
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
+    }
+}
+
+impl MavlinkPlanGenerator {
+    fn save_plan_to_file(&mut self, file_name: &String) {
+        let mut plan = MavLinkPlan::new(
+            self.weather_info.wind_data.direction_10m.unwrap(),
+        );
+
+        plan.add_path(&self.position_info.optimal_path_from_take_off_to_goal);
+        plan.add_goal_position(&self.position_info.goal_position);
+        plan.add_path(&self.position_info.optimal_path_from_goal_to_landing);
+
+
+        self.plan = Some(plan);
+        // Create a file to save the formatted JSON
+        let file = File::create(&file_name).expect("Failed to create file");
+        let writer = BufWriter::new(file);
+
+        // Serialize and format the data with newlines and indentation
+        serde_json::to_writer_pretty(writer, &self.plan)
+            .expect("Failed to write JSON data to file");
     }
 }
 
