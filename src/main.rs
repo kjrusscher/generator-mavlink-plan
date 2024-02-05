@@ -78,8 +78,6 @@ struct AppPickListTime {
 
 struct AppPositionInfo {
     drone_position: geo::Point,
-    // take_off_waypoints: Vec<geo::Point>,
-    // landing_waypoints: Vec<geo::Point>,
     goal_position: geo::Point,
     optimal_path_from_take_off_to_goal: Vec<geo::Point>,
     optimal_path_from_goal_to_landing: Vec<geo::Point>,
@@ -345,13 +343,6 @@ impl Sandbox for MavlinkPlanGenerator {
         .on_input(Message::InputGoalLatitudeChanged)
         .width(Length::Fixed(190.0));
 
-        let picklist = pick_list(
-            &self.pick_list_time.time_options,
-            self.pick_list_time.selected_time.clone(),
-            Message::OptionSelected,
-        )
-        .placeholder("Kies een tijd...");
-
         let left_column = column![
             vertical_space(20),
             start_location_text,
@@ -368,9 +359,6 @@ impl Sandbox for MavlinkPlanGenerator {
             ]
             .align_items(Alignment::Center),
             vertical_space(30),
-            text(format!("Wanneer wil je vliegen?")).size(25),
-            picklist,
-            vertical_space(20),
         ]
         .width(Length::Fill)
         .align_items(Alignment::Center)
@@ -417,14 +405,24 @@ impl Sandbox for MavlinkPlanGenerator {
         .size(20);
         let button_weather = Button::new("Update").on_press(Message::UpdateWeatherInfo);
 
+        let picklist = pick_list(
+            &self.pick_list_time.time_options,
+            self.pick_list_time.selected_time.clone(),
+            Message::OptionSelected,
+        )
+        .placeholder("Kies een tijd...");
+
         let middle_column = column![
-            vertical_space(20),
-            text(format!("Windrichting")).size(25),
-            wind_direction_10,
-            wind_direction_80,
-            wind_direction_120,
-            button_weather,
-            vertical_space(20)
+        vertical_space(20),
+        text(format!("Windrichting")).size(25),
+        wind_direction_10,
+        wind_direction_80,
+        wind_direction_120,
+        button_weather,
+        vertical_space(20),
+        text(format!("Wanneer wil je vliegen?")).size(25),
+        picklist,
+        vertical_space(20),
         ]
         .width(Length::Fill)
         .align_items(Alignment::Center)
@@ -478,14 +476,11 @@ impl Sandbox for MavlinkPlanGenerator {
 
 impl MavlinkPlanGenerator {
     fn save_plan_to_file(&mut self, file_name: &String) {
-        let mut plan = MavLinkPlan::new(
-            self.weather_info.wind_data.direction_10m.unwrap(),
-        );
+        let mut plan = MavLinkPlan::new(self.weather_info.wind_data.direction_10m.unwrap());
 
         plan.add_path(&self.position_info.optimal_path_from_take_off_to_goal);
         plan.add_goal_position(&self.position_info.goal_position);
         plan.add_path(&self.position_info.optimal_path_from_goal_to_landing);
-
 
         self.plan = Some(plan);
         // Create a file to save the formatted JSON
