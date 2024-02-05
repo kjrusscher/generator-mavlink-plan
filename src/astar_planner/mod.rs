@@ -7,8 +7,6 @@
 
 //! A* path planner
 
-// use crate::mav_link_plan;
-
 use dubins_paths::{DubinsPath, PosRot};
 use geo;
 use geo::algorithm::intersects::Intersects;
@@ -28,7 +26,7 @@ pub struct AStarPlanner {
     // closed_set: HashMap<GeospatialPose, Rc<Node>>,
     start_pose: GeospatialPose, // Waypoint where take off sequence ends
     goal_pose: GeospatialPose,  // Where do you want to fly
-    end_pose: GeospatialPose,   // Waypoint where landing sequence revstarts
+    end_pose: GeospatialPose,   // Waypoint where landing sequence starts
     optimal_path_from_start_to_goal: Vec<Rc<Node>>,
     optimal_path_from_goal_to_end: Vec<Rc<Node>>,
     geo_fences_polygon: geo::MultiLineString,
@@ -139,7 +137,7 @@ impl AStarPlanner {
         geo_fence_circle.push(geo::Point::new(52.28968817161486, 6.8797506782361495));
         geo_fence_circle.push(geo::Point::new(52.29148311807836, 6.8843410345191955));
 
-        let mut a_star_planner = AStarPlanner {
+        let a_star_planner = AStarPlanner {
             // open_set: BinaryHeap::new(),
             // closed_set: HashMap::new(),
             start_pose: start_pose,
@@ -156,21 +154,6 @@ impl AStarPlanner {
             geo_fences_circles: geo_fence_circle,
             // geo_fences_circles: vec![],
         };
-
-        // let cost_to_goal = calculate_h(&start_pose, &goal_pose);
-        //
-        // let start_node = Rc::new(planning_waypoints::Node {
-        //     pose: start_pose,
-        //     traveled_distance: 0.0,
-        //     steering: 0.0,
-        //     steering_integral: 0.0,
-        //     g: 0.0,
-        //     h: cost_to_goal,
-        //     f: cost_to_goal + 0.0,
-        //     parent: None,
-        // });
-
-        // a_star_planner.open_set.push(start_node);
 
         Ok(a_star_planner)
     }
@@ -223,7 +206,7 @@ impl AStarPlanner {
                 let steering = pose.heading - parent.pose.heading;
                 let steering_integral = parent.steering_integral + steering.abs();
 
-                let cost_so_far = calculate_g(&pose, &parent, distance_increment);
+                let cost_so_far = parent.g + calculate_delta_g(&pose, &parent, distance_increment);
                 let cost_to_goal = calculate_h(&pose, end_pose);
 
                 let node = Rc::new(Node {
@@ -233,7 +216,7 @@ impl AStarPlanner {
                     steering_integral: steering_integral,
                     g: cost_so_far,
                     h: cost_to_goal,
-                    f: cost_so_far + cost_to_goal,
+                    f: cost_so_far + cost_to_goal, // + 0.0001 * steering_integral*steering_integral,
                     parent: Some(Rc::clone(&parent)),
                 });
 
@@ -311,7 +294,7 @@ impl GeospatialPose {
         let mut next_poses = Vec::new();
 
         // turn 90 degree left
-        next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
+        // next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
         // turn 45 degree left
         next_poses.push(self.calculate_next_pose(-45.0, distance_increment));
         // turn 22.5 degree left
@@ -327,7 +310,7 @@ impl GeospatialPose {
         // turn 45 degrees right
         next_poses.push(self.calculate_next_pose(45.0, distance_increment));
         // turn 90 degrees right
-        next_poses.push(self.calculate_next_pose(90.0, distance_increment));
+        // next_poses.push(self.calculate_next_pose(90.0, distance_increment));
 
         return next_poses;
     }
@@ -397,7 +380,7 @@ impl GeospatialPose {
             false
         } else {
             for point in geo_fence_circle.iter() {
-                if circle_line_intersect(&point, 100.0, &drone_path) {
+                if circle_line_intersect(&point, 140.0, &drone_path) {
                     return false;
                 }
             }
@@ -428,11 +411,13 @@ fn chord_length(arc_length: f64, angle_degrees: f64) -> f64 {
 }
 
 /// Calculate cost so far
-fn calculate_g(child_pose: &GeospatialPose, parent_node: &Node, distance_increment: f64) -> f64 {
-    // parent_node.g + distance_increment
-    let steering_weight = 4.0;
+fn calculate_delta_g(
+    child_pose: &GeospatialPose,
+    parent_node: &Node,
+    distance_increment: f64,
+) -> f64 {
     let steering = heading_difference(child_pose.heading, parent_node.pose.heading);
-    parent_node.g + distance_increment + steering_weight * steering * steering
+    cost_function(distance_increment, steering)
 }
 
 /// Calculate cost to goal
@@ -463,9 +448,7 @@ fn calculate_h(pose: &GeospatialPose, goal_pose: &GeospatialPose) -> f64 {
         distance = shortest_path_possible.length() as f64;
     }
 
-    // distance
-    let steering_weight = 4.0;
-    distance + steering_weight * new_heading * new_heading
+    cost_function(distance, new_heading)
 }
 
 /// Calculate length of Dubins Path for Left Turn - Straight
@@ -529,12 +512,12 @@ fn circle_line_intersect(
     let dy = y2 - y1;
 
     // Coefficients for the quadratic equation Ax^2 + Bx + C = 0
-    let a = dx.powi(2) + dy.powi(2);
+    let a = dx*dx + dy*dy;
     let b = 2.0 * (x1 * dx + y1 * dy);
-    let c = x1.powi(2) + y1.powi(2) - radius.powi(2);
+    let c = x1*x1+ y1*y1 - radius*radius;
 
     // Discriminant
-    let discriminant = b.powi(2) - 4.0 * a * c;
+    let discriminant = b*b - 4.0 * a * c;
 
     if discriminant < 0.0 {
         // No real solutions, the line does not intersect the circle
@@ -554,7 +537,50 @@ fn transform_geo_to_cartesian_coordinates(
     other_point: &geo::Point<f64>,
 ) -> (f64, f64) {
     let geod = Geodesic::wgs84();
+
     let (s12, az1, _, _) = geod.inverse(origin.x(), origin.y(), other_point.x(), other_point.y());
 
-    (s12 * az1.sin(), s12 * az1.cos())
+    let az1_pi = az1 * (PI / 180.0);
+
+    (s12 * az1_pi.sin(), s12 * az1_pi.cos())
+}
+
+fn cost_function(distance: f64, steering: f64) -> f64 {
+    // // Minimize distance. Get's the shortest path possible. Downside is that it creates a lot of nodes because
+    // // all steering is allowed.
+    // // distance only
+    // distance
+
+    // Minimize distance plus steering. Steering is penalized on a per node basis.
+    // distance + steering
+    let steering_weight = 10.0;
+    distance + steering_weight * steering.abs()
+
+    // // Minimize distance plus steering squared. Steering is penalized squared on a per node basis. This means
+    // // that if we have to steer 90 degrees to get to our goal, taking a wide turn over multiple nodes if favored over
+    // // a tight turn.
+    // // distance + steering^2
+    // let steering_weight = 4.0;
+    // distance + steering_weight * steering * steering
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_heading_difference() {
+        assert_eq!(heading_difference(0.0, 270.0), 90.0);
+    }
+
+    #[test]
+    fn test_circle_line_intersect() {
+        let circle_center = geo::Point::new(52.288131372606706, 6.875354239578542);
+        let radius = 100.0;
+        let line = geo::Line::new(
+            geo::coord! {x:52.2880218, y:6.8769461},
+            geo::coord! {x:52.2883900, y:6.8739277},
+        );
+        assert_eq!(circle_line_intersect(&circle_center, radius, &line), true);
+    }
 }
