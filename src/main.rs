@@ -90,6 +90,7 @@ struct MavlinkPlanGenerator {
     weather_info: AppWeatherInfo,
     pick_list_time: AppPickListTime,
     pop_up: AppPopUpInfo,
+    file_name: String,
 }
 
 /// Definitions for Iced
@@ -104,6 +105,8 @@ enum Message {
     InputDroneLatitudeChanged(String),
     InputGoalLongitudeChanged(String),
     InputGoalLatitudeChanged(String),
+    InputFileName(String),
+    LoadPressed,
 }
 
 impl Sandbox for MavlinkPlanGenerator {
@@ -138,8 +141,6 @@ impl Sandbox for MavlinkPlanGenerator {
         let geo_info = AppPositionInfo {
             drone_position: geo::Point::new(52.282538406253, 6.898364382855505),
             goal_position: geo::Point::new(52.2878797, 6.8706270),
-            // take_off_waypoints: Vec::new(),
-            // landing_waypoints: Vec::new(),
             optimal_path_from_take_off_to_goal: Vec::new(),
             optimal_path_from_goal_to_landing: Vec::new(),
         };
@@ -150,6 +151,7 @@ impl Sandbox for MavlinkPlanGenerator {
             position_info: geo_info,
             pick_list_time: pick_list_time,
             pop_up: pop_up_info,
+            file_name: "Geofence Fase I met exclusion zone KJR.plan".to_string(),
         }
     }
 
@@ -312,10 +314,29 @@ impl Sandbox for MavlinkPlanGenerator {
                     self.position_info.goal_position.set_y(value);
                 }
             }
+            Message::InputFileName(string_value) => {
+                self.file_name = string_value;
+            }
+            Message::LoadPressed => {
+                let file = std::fs::read_to_string(&self.file_name).unwrap();
+                self.plan = serde_json::from_str(&file).unwrap();
+                println!(
+                    "{}:{}: inclusion is {}.",
+                    file!(),
+                    line!(),
+                    self.plan.as_ref().unwrap().geoFence.polygons[0].inclusion
+                );
+            }
         }
     }
 
     fn view(&self) -> Element<Message> {
+        let file_name_text = text(format!("Bestandsnaam")).size(25);
+        let file_name_input = TextInput::new("File Name", &self.file_name)
+            .on_input(Message::InputFileName)
+            .width(Length::Fill);
+        let button_load = Button::new("Laad .plan bestand").on_press(Message::LoadPressed);
+
         let start_location_text = text(format!("Drone")).size(25);
         let drone_longitude = TextInput::new(
             "Longitude",
@@ -344,6 +365,10 @@ impl Sandbox for MavlinkPlanGenerator {
         .width(Length::Fixed(190.0));
 
         let left_column = column![
+            vertical_space(20),
+            file_name_text,
+            file_name_input,
+            button_load,
             vertical_space(20),
             start_location_text,
             row![
@@ -413,16 +438,16 @@ impl Sandbox for MavlinkPlanGenerator {
         .placeholder("Kies een tijd...");
 
         let middle_column = column![
-        vertical_space(20),
-        text(format!("Windrichting")).size(25),
-        wind_direction_10,
-        wind_direction_80,
-        wind_direction_120,
-        button_weather,
-        vertical_space(20),
-        text(format!("Wanneer wil je vliegen?")).size(25),
-        picklist,
-        vertical_space(20),
+            vertical_space(20),
+            text(format!("Windrichting")).size(25),
+            wind_direction_10,
+            wind_direction_80,
+            wind_direction_120,
+            button_weather,
+            vertical_space(20),
+            text(format!("Wanneer wil je vliegen?")).size(25),
+            picklist,
+            vertical_space(20),
         ]
         .width(Length::Fill)
         .align_items(Alignment::Center)
@@ -476,31 +501,24 @@ impl Sandbox for MavlinkPlanGenerator {
 
 impl MavlinkPlanGenerator {
     fn save_plan_to_file(&mut self, file_name: &String) {
-        let mut plan = MavLinkPlan::new(self.weather_info.wind_data.direction_10m.unwrap());
+        // let mut plan = MavLinkPlan::new(self.weather_info.wind_data.direction_10m.unwrap());
+        
+        if let Some(plan) = self.plan.as_mut() {
+            plan.add_path(&self.position_info.optimal_path_from_take_off_to_goal);
+            plan.add_goal_position(&self.position_info.goal_position);
+            plan.add_path(&self.position_info.optimal_path_from_goal_to_landing);
 
-        plan.add_path(&self.position_info.optimal_path_from_take_off_to_goal);
-        plan.add_goal_position(&self.position_info.goal_position);
-        plan.add_path(&self.position_info.optimal_path_from_goal_to_landing);
+            // Create a file to save the formatted JSON
+            let file = File::create(&file_name).expect("Failed to create file");
+            let writer = BufWriter::new(file);
 
-        self.plan = Some(plan);
-        // Create a file to save the formatted JSON
-        let file = File::create(&file_name).expect("Failed to create file");
-        let writer = BufWriter::new(file);
-
-        // Serialize and format the data with newlines and indentation
-        serde_json::to_writer_pretty(writer, &self.plan)
-            .expect("Failed to write JSON data to file");
+            // Serialize and format the data with newlines and indentation
+            serde_json::to_writer_pretty(writer, &plan)
+                .expect("Failed to write JSON data to file");
+        }
     }
 }
 
 pub fn main() -> iced::Result {
-    // let file = std::fs::read_to_string("Geofence_Fase_1_zonder_exclusion_zone.plan").unwrap();
-    // let plan: mav_link_plan::MavLinkPlan = serde_json::from_str(&file).unwrap();
-    // println!(
-    //     "{}:{}: inclusion is {}.",
-    //     file!(),
-    //     line!(),
-    //     plan.geoFence.polygons[0].inclusion
-    // );
     MavlinkPlanGenerator::run(Settings::default())
 }

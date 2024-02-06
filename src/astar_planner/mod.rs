@@ -17,6 +17,8 @@ use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::rc::Rc;
 
+use crate::mav_link_plan;
+
 mod planning_waypoints;
 use planning_waypoints::{GeospatialPose, Node};
 
@@ -31,6 +33,7 @@ pub struct AStarPlanner {
     optimal_path_from_goal_to_end: Vec<Rc<Node>>,
     geo_fences_polygon: geo::MultiLineString,
     geo_fences_circles: Vec<geo::Point>,
+    geo_fences: Option<mav_link_plan::GeoFence>,
 }
 
 impl AStarPlanner {
@@ -153,9 +156,14 @@ impl AStarPlanner {
             ]),
             geo_fences_circles: geo_fence_circle,
             // geo_fences_circles: vec![],
+            geo_fences: None,
         };
 
         Ok(a_star_planner)
+    }
+
+    pub fn add_geo_fences(&mut self, geo_fences: mav_link_plan::GeoFence) {
+        self.geo_fences = Some(geo_fences);
     }
 
     fn calculate_path(
@@ -216,7 +224,7 @@ impl AStarPlanner {
                     steering_integral: steering_integral,
                     g: cost_so_far,
                     h: cost_to_goal,
-                    f: cost_so_far + cost_to_goal + 0.0001 * steering_integral*steering_integral,
+                    f: cost_so_far + cost_to_goal + 0.0001 * steering_integral * steering_integral,
                     parent: Some(Rc::clone(&parent)),
                 });
 
@@ -226,7 +234,7 @@ impl AStarPlanner {
                     node.pose.position.y(),
                     end_pose.position.x(),
                     end_pose.position.y(),
-                ); 
+                );
                 if distance < distance_increment {
                     path_not_found = false;
                     points_in_reach_of_goal.push(Rc::clone(&node));
@@ -263,11 +271,7 @@ impl AStarPlanner {
         let mut optimal_path_from_start_to_goal: Vec<geo::Point> = Vec::new();
 
         if self.optimal_path_from_start_to_goal.len() > 2 {
-            for point in self.optimal_path_from_start_to_goal
-                [1..]
-                .iter()
-                .rev()
-            {
+            for point in self.optimal_path_from_start_to_goal[1..].iter().rev() {
                 optimal_path_from_start_to_goal.push(point.pose.position);
             }
         }
