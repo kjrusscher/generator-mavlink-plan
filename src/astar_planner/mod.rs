@@ -11,6 +11,8 @@ use dubins_paths::{DubinsPath, PosRot};
 use geo;
 use geo::algorithm::intersects::Intersects;
 use geo::Contains;
+use geo_types::coord;
+use geo_types::polygon;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
@@ -33,7 +35,6 @@ pub struct AStarPlanner {
     optimal_path_from_goal_to_end: Vec<Rc<Node>>,
     geo_fences_polygon: geo::MultiLineString,
     geo_fences_circles: Vec<geo::Point>,
-    geo_fences: Option<mav_link_plan::GeoFence>,
 }
 
 impl AStarPlanner {
@@ -149,23 +150,43 @@ impl AStarPlanner {
             optimal_path_from_start_to_goal: Vec::new(),
             optimal_path_from_goal_to_end: Vec::new(),
             geo_fences_polygon: geo::MultiLineString::new(vec![
-                geo_fence_border,
+                // geo_fence_border,
                 // geo_fence_railway_1,
                 // geo_fence_railway_2,
                 // geo_fence_railway,
             ]),
-            geo_fences_circles: geo_fence_circle,
+            geo_fences_circles: vec![],
+            // geo_fences_circles: geo_fence_circle,
             // geo_fences_circles: vec![],
-            geo_fences: None,
         };
 
         Ok(a_star_planner)
     }
 
-    pub fn add_geo_fences(&mut self, geo_fences: mav_link_plan::GeoFence) {
-        self.geo_fences = Some(geo_fences);
+    /// Read a MavLink GeoFence structure and translate it to geo::Points and geo::LineStrings
+    /// for use by the A* Planner.
+    pub fn add_geo_fences(&mut self, geo_fences: &mav_link_plan::GeoFence) {
+        let mut geo_fence_polygons_vector = vec![];
+        for geo_fence_polygon in geo_fences.polygons.iter() {
+            let mut polygon_vector = vec![];
+            for point in geo_fence_polygon.polygon.iter() {
+                polygon_vector.push(coord! {x: point[0], y: point[1]});
+            }
+            polygon_vector.push(polygon_vector[0]);
+            geo_fence_polygons_vector.push(geo::LineString::new(polygon_vector));
+        }
+        self.geo_fences_polygon = geo::MultiLineString::new(geo_fence_polygons_vector);
+
+        for geo_fence_circle in geo_fences.circles.iter() {
+            self.geo_fences_circles.push(geo::Point::new(
+                geo_fence_circle.circle.center[0],
+                geo_fence_circle.circle.center[1],
+            ));
+        }
     }
 
+    /// Calculate path from position and orientation of begin_pose to the position of the end_pose.
+    /// This does not take the end orientation into account.
     fn calculate_path(
         &self,
         begin_pose: &GeospatialPose,

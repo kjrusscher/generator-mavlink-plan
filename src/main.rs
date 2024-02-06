@@ -223,9 +223,12 @@ impl Sandbox for MavlinkPlanGenerator {
                     end_position,
                     end_heading,
                 );
-
+                
                 match test_a_star_planner {
                     Ok(mut a_star_planner) => {
+                        if let Some(plan) = self.plan.as_ref() {
+                            a_star_planner.add_geo_fences(&plan.geoFence);
+                        }
                         let start = Instant::now();
                         self.position_info.optimal_path_from_take_off_to_goal =
                             a_star_planner.get_optimal_path_to_goal();

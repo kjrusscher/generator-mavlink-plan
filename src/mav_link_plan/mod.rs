@@ -18,14 +18,14 @@ pub enum MavCmd {
 }
 
 /// Used in GeoFenceCirle
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Circle {
     pub center: [f64; 2],
     pub radius: f64,
 }
 
 /// Used in GeoFence
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GeoFenceCircle {
     pub circle: Circle,
     pub inclusion: bool,
@@ -33,7 +33,7 @@ pub struct GeoFenceCircle {
 }
 
 /// Used in GeoFence
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GeoFencePolygon {
     pub inclusion: bool,
     pub polygon: Vec<[f64; 2]>,
@@ -41,7 +41,7 @@ pub struct GeoFencePolygon {
 }
 
 /// Used in MavLinkPlan
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GeoFence {
     pub circles: Vec<GeoFenceCircle>,
     pub polygons: Vec<GeoFencePolygon>,
