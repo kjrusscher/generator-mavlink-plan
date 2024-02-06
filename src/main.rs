@@ -208,10 +208,14 @@ impl Sandbox for MavlinkPlanGenerator {
                 }
             }
             Message::PlanRoute => {
-                let start_position = geo::Point::new(52.2825397, 6.8984103);
-                let start_heading = 0.0;
-                let end_position = geo::Point::new(52.2825397, 6.8984103);
-                let end_heading = 0.0;
+                let start_position = mav_link_plan::get_take_off_waypoint(f64::from(
+                    self.weather_info.wind_data.direction_10m.unwrap(),
+                ));
+                let start_heading = f64::from(self.weather_info.wind_data.direction_10m.unwrap());
+                let end_position = mav_link_plan::get_landing_waypoint(f64::from(
+                    self.weather_info.wind_data.direction_10m.unwrap(),
+                ));
+                let end_heading = f64::from(self.weather_info.wind_data.direction_10m.unwrap());
                 let test_a_star_planner = astar_planner::AStarPlanner::new(
                     start_position,
                     start_heading,
@@ -501,20 +505,19 @@ impl Sandbox for MavlinkPlanGenerator {
 
 impl MavlinkPlanGenerator {
     fn save_plan_to_file(&mut self, file_name: &String) {
-        // let mut plan = MavLinkPlan::new(self.weather_info.wind_data.direction_10m.unwrap());
-        
         if let Some(plan) = self.plan.as_mut() {
+            plan.add_take_off_sequence(f64::from(self.weather_info.wind_data.direction_10m.unwrap()));
             plan.add_path(&self.position_info.optimal_path_from_take_off_to_goal);
             plan.add_goal_position(&self.position_info.goal_position);
             plan.add_path(&self.position_info.optimal_path_from_goal_to_landing);
+            plan.add_landing_sequence(f64::from(self.weather_info.wind_data.direction_10m.unwrap()));
 
             // Create a file to save the formatted JSON
             let file = File::create(&file_name).expect("Failed to create file");
             let writer = BufWriter::new(file);
 
             // Serialize and format the data with newlines and indentation
-            serde_json::to_writer_pretty(writer, &plan)
-                .expect("Failed to write JSON data to file");
+            serde_json::to_writer_pretty(writer, &plan).expect("Failed to write JSON data to file");
         }
     }
 }
