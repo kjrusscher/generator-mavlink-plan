@@ -74,19 +74,21 @@ struct AppPopUpInfo {
 struct AppPickListTime {
     time_options: Vec<String>,
     selected_time: Option<String>,
+    time_picked: bool,
 }
 
-struct AppPositionInfo {
+struct AppPathInfo {
     drone_position: geo::Point,
     goal_position: geo::Point,
     optimal_path_from_take_off_to_goal: Vec<geo::Point>,
     optimal_path_from_goal_to_landing: Vec<geo::Point>,
+    path_planned: bool,
 }
 
 /// Stores state information for application
 struct MavlinkPlanGenerator {
     plan: Option<MavLinkPlan>,
-    position_info: AppPositionInfo,
+    path_info: AppPathInfo,
     weather_info: AppWeatherInfo,
     pick_list_time: AppPickListTime,
     pop_up: AppPopUpInfo,
@@ -120,6 +122,7 @@ impl Sandbox for MavlinkPlanGenerator {
         let pick_list_time = AppPickListTime {
             time_options: Vec::new(),
             selected_time: None,
+            time_picked: false,
         };
 
         let pop_up_info = AppPopUpInfo {
@@ -138,17 +141,18 @@ impl Sandbox for MavlinkPlanGenerator {
             },
         };
 
-        let geo_info = AppPositionInfo {
+        let geo_info = AppPathInfo {
             drone_position: geo::Point::new(52.282538406253, 6.898364382855505),
             goal_position: geo::Point::new(52.2878797, 6.8706270),
             optimal_path_from_take_off_to_goal: Vec::new(),
             optimal_path_from_goal_to_landing: Vec::new(),
+            path_planned: false,
         };
 
         MavlinkPlanGenerator {
             plan: None,
             weather_info: weather_info,
-            position_info: geo_info,
+            path_info: geo_info,
             pick_list_time: pick_list_time,
             pop_up: pop_up_info,
             file_name: "Geofence Fase I met exclusion zone KJR.plan".to_string(),
@@ -183,13 +187,14 @@ impl Sandbox for MavlinkPlanGenerator {
                         .unwrap()
                         .direction_120m,
                 };
+                self.pick_list_time.time_picked = true;
             }
             Message::SavePressed => {
                 if self.pick_list_time.selected_time.is_none() {
                     self.pop_up.text = "Selecteer een tijd".to_string();
                     self.pop_up.show = true;
-                } else if self.position_info.optimal_path_from_take_off_to_goal.len() == 0
-                    || self.position_info.optimal_path_from_goal_to_landing.len() == 0
+                } else if self.path_info.optimal_path_from_take_off_to_goal.len() == 0
+                    || self.path_info.optimal_path_from_goal_to_landing.len() == 0
                 {
                     self.pop_up.text = "Plan eerst een route".to_string();
                     self.pop_up.show = true;
@@ -219,7 +224,7 @@ impl Sandbox for MavlinkPlanGenerator {
                 let test_a_star_planner = astar_planner::AStarPlanner::new(
                     start_position,
                     start_heading,
-                    self.position_info.goal_position,
+                    self.path_info.goal_position,
                     end_position,
                     end_heading,
                 );
@@ -230,13 +235,14 @@ impl Sandbox for MavlinkPlanGenerator {
                             a_star_planner.add_geo_fences(&plan.geoFence);
                         }
                         let start = Instant::now();
-                        self.position_info.optimal_path_from_take_off_to_goal =
+                        self.path_info.optimal_path_from_take_off_to_goal =
                             a_star_planner.get_optimal_path_to_goal();
-                        self.position_info.optimal_path_from_goal_to_landing =
+                        self.path_info.optimal_path_from_goal_to_landing =
                             a_star_planner.get_optimal_path_from_goal();
                         let duration = start.elapsed();
-                        // self.position_info.optimal_path = a_star_planner.get_all_points();
+                        // self.path_info.optimal_path = a_star_planner.get_all_points();
                         println!("Route geplanned in {:.1?}.", duration);
+                        self.path_info.path_planned = true;
                     }
                     Err(message) => {
                         self.pop_up.text = message + ". Pas deze waarde aan, aub.";
@@ -270,6 +276,7 @@ impl Sandbox for MavlinkPlanGenerator {
                             self.pick_list_time.selected_time =
                                 Some(self.pick_list_time.time_options[0].clone());
                         }
+                        self.pick_list_time.time_picked = true;
                         self.weather_info.weather_data = Some(weather_info);
                         self.weather_info.wind_data = WindData {
                             direction_10m: self
@@ -303,22 +310,22 @@ impl Sandbox for MavlinkPlanGenerator {
             }
             Message::InputDroneLongitudeChanged(string_value) => {
                 if let Ok(value) = string_value.parse::<f64>() {
-                    self.position_info.drone_position.set_x(value);
+                    self.path_info.drone_position.set_x(value);
                 }
             }
             Message::InputDroneLatitudeChanged(string_value) => {
                 if let Ok(value) = string_value.parse::<f64>() {
-                    self.position_info.drone_position.set_x(value);
+                    self.path_info.drone_position.set_x(value);
                 }
             }
             Message::InputGoalLongitudeChanged(string_value) => {
                 if let Ok(value) = string_value.parse::<f64>() {
-                    self.position_info.goal_position.set_x(value);
+                    self.path_info.goal_position.set_x(value);
                 }
             }
             Message::InputGoalLatitudeChanged(string_value) => {
                 if let Ok(value) = string_value.parse::<f64>() {
-                    self.position_info.goal_position.set_y(value);
+                    self.path_info.goal_position.set_y(value);
                 }
             }
             Message::InputFileName(string_value) => {
@@ -347,26 +354,26 @@ impl Sandbox for MavlinkPlanGenerator {
         let start_location_text = text(format!("Drone")).size(25);
         let drone_longitude = TextInput::new(
             "Longitude",
-            &self.position_info.drone_position.x().to_string(),
+            &self.path_info.drone_position.x().to_string(),
         )
         .on_input(Message::InputDroneLongitudeChanged)
         .width(Length::Fixed(190.0));
         let drone_latitude = TextInput::new(
             "Latitude ",
-            &self.position_info.drone_position.y().to_string(),
+            &self.path_info.drone_position.y().to_string(),
         )
         .on_input(Message::InputDroneLatitudeChanged)
         .width(Length::Fixed(190.0));
 
         let input_longitude = TextInput::new(
             "Longitude",
-            &self.position_info.goal_position.x().to_string(),
+            &self.path_info.goal_position.x().to_string(),
         )
         .on_input(Message::InputGoalLongitudeChanged)
         .width(Length::Fixed(190.0));
         let input_latitude = TextInput::new(
             "Latitude ",
-            &self.position_info.goal_position.y().to_string(),
+            &self.path_info.goal_position.y().to_string(),
         )
         .on_input(Message::InputGoalLatitudeChanged)
         .width(Length::Fixed(190.0));
@@ -460,13 +467,25 @@ impl Sandbox for MavlinkPlanGenerator {
         .align_items(Alignment::Center)
         .spacing(10);
 
-        let button_save = Button::new("Opslaan").on_press(Message::SavePressed);
-        let button_astar_test = Button::new("Plan Route").on_press(Message::PlanRoute);
+        let button_save_enabled: Option<Message>;
+        if self.pick_list_time.time_picked && self.path_info.path_planned {
+            button_save_enabled = Some(Message::SavePressed);
+        } else {
+            button_save_enabled = None;
+        }
+        let button_save = Button::new("Opslaan").on_press_maybe(button_save_enabled);
+        let button_astar_enabled: Option<Message>;
+        if self.pick_list_time.time_picked {
+            button_astar_enabled = Some(Message::PlanRoute);
+        } else {
+            button_astar_enabled = None;
+        }
+        let button_astar = Button::new("Plan Route").on_press_maybe(button_astar_enabled);
 
         let right_column = column![
             vertical_space(20),
             text(format!("Vluchtplan")).size(25),
-            button_astar_test,
+            button_astar,
             button_save,
             vertical_space(20)
         ]
@@ -510,9 +529,9 @@ impl MavlinkPlanGenerator {
     fn save_plan_to_file(&mut self, file_name: &String) {
         if let Some(plan) = self.plan.as_mut() {
             plan.add_take_off_sequence(f64::from(self.weather_info.wind_data.direction_10m.unwrap()));
-            plan.add_path(&self.position_info.optimal_path_from_take_off_to_goal);
-            plan.add_goal_position(&self.position_info.goal_position);
-            plan.add_path(&self.position_info.optimal_path_from_goal_to_landing);
+            plan.add_path(&self.path_info.optimal_path_from_take_off_to_goal);
+            plan.add_goal_position(&self.path_info.goal_position);
+            plan.add_path(&self.path_info.optimal_path_from_goal_to_landing);
             plan.add_landing_sequence(f64::from(self.weather_info.wind_data.direction_10m.unwrap()));
 
             // Create a file to save the formatted JSON

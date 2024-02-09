@@ -12,7 +12,6 @@ use geo;
 use geo::algorithm::intersects::Intersects;
 use geo::Contains;
 use geo_types::coord;
-use geo_types::polygon;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
@@ -20,14 +19,11 @@ use std::f64::consts::PI;
 use std::rc::Rc;
 
 use crate::mav_link_plan;
-
 mod planning_waypoints;
 use planning_waypoints::{GeospatialPose, Node};
 
-/// Data for open set, closed set, goal pose, and optimal path for the A* planner.
+/// Data for the A* planner.
 pub struct AStarPlanner {
-    // open_set: BinaryHeap<Rc<Node>>,
-    // closed_set: HashMap<GeospatialPose, Rc<Node>>,
     start_pose: GeospatialPose, // Waypoint where take off sequence ends
     goal_pose: GeospatialPose,  // Where do you want to fly
     end_pose: GeospatialPose,   // Waypoint where landing sequence starts
@@ -93,8 +89,8 @@ impl AStarPlanner {
             // repeat first point to close the loop
             geo::coord! {x:52.28295542244744, y: 6.8565871319299845},
         ]);
-
         let geo_fence_border_polygon = geo::Polygon::new(geo_fence_border.clone(), vec![]);
+
         // The start and goal position should be inside the geo_fence
         if !geo_fence_border_polygon.contains(&start_pose.position) {
             return Err(String::from("Ongeldige drone positie."));
@@ -103,61 +99,14 @@ impl AStarPlanner {
             return Err(String::from("Ongeldige doel positie."));
         }
 
-        // let geo_fence_railway = geo::LineString::new(vec![
-        //     geo::coord! {x:52.28397132247375, y: 6.863886719371692},
-        //     geo::coord! {x:52.2911115585158, y: 6.8829664192158475},
-        //     geo::coord! {x:52.29095744346746, y: 6.883631641810979},
-        //     geo::coord! {x:52.28354519237769, y: 6.863920220780301},
-        //     // repeat first point to close the loop
-        //     geo::coord! {x:52.28397132247375, y: 6.863886719371692},
-        // ]);
-        // let geo_fence_railway_1 = geo::LineString::new(vec![
-        //     geo::coord!{x:52.28397132247375, y: 6.863886719371692},
-        //     geo::coord!{x:52.287510968119605, y: 6.8733916286129215},
-        //     geo::coord!{x:52.28729986661546, y: 6.8737774312500335},
-        //     geo::coord!{x:52.28354519237769, y: 6.863920220780301},
-        //     geo::coord!{x:52.28397132247375, y: 6.863886719371692},
-        // ]);
-        // let geo_fence_railway_2 = geo::LineString::new(vec![
-        //     geo::coord!{x:52.288720670228805, y: 6.876414304674057},
-        //     geo::coord!{x:52.29175801033167, y: 6.884476228939008},
-        //     geo::coord!{x:52.291441047529446, y: 6.885057644180449},
-        //     geo::coord!{x:52.288457999488145, y: 6.876892999221496},
-        //     geo::coord!{x:52.288720670228805, y: 6.876414304674057},
-        // ]);
-
-        let mut geo_fence_circle: Vec<geo::Point> = Vec::new();
-        // 5 circles on railway
-        // geo_fence_circle.push(geo::Point::new(52.28342150438976, 6.862740698960664));
-        // geo_fence_circle.push(geo::Point::new(52.28517350285496, 6.867905173957723));
-        // geo_fence_circle.push(geo::Point::new(52.28717792705092, 6.87317966396094));
-        // geo_fence_circle.push(geo::Point::new(52.289274467917615, 6.878535125811709));
-        // geo_fence_circle.push(geo::Point::new(52.29119602537627, 6.883766547104244));
-        // 6 circles on railway
-        geo_fence_circle.push(geo::Point::new(52.283105290274484, 6.861985238490377));
-        geo_fence_circle.push(geo::Point::new(52.28466271451338, 6.866473775137109));
-        geo_fence_circle.push(geo::Point::new(52.28644826062613, 6.871032565740023));
-        geo_fence_circle.push(geo::Point::new(52.288131372606706, 6.875354239578542));
-        geo_fence_circle.push(geo::Point::new(52.28968817161486, 6.8797506782361495));
-        geo_fence_circle.push(geo::Point::new(52.29148311807836, 6.8843410345191955));
-
         let a_star_planner = AStarPlanner {
-            // open_set: BinaryHeap::new(),
-            // closed_set: HashMap::new(),
             start_pose: start_pose,
             goal_pose: goal_pose,
             end_pose: end_pose,
             optimal_path_from_start_to_goal: Vec::new(),
             optimal_path_from_goal_to_end: Vec::new(),
-            geo_fences_polygon: geo::MultiLineString::new(vec![
-                // geo_fence_border,
-                // geo_fence_railway_1,
-                // geo_fence_railway_2,
-                // geo_fence_railway,
-            ]),
+            geo_fences_polygon: geo::MultiLineString::new(vec![]),
             geo_fences_circles: vec![],
-            // geo_fences_circles: geo_fence_circle,
-            // geo_fences_circles: vec![],
         };
 
         Ok(a_star_planner)
@@ -321,7 +270,7 @@ impl GeospatialPose {
         let mut next_poses = Vec::new();
 
         // turn 90 degree left
-        // next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
+        next_poses.push(self.calculate_next_pose(-90.0, distance_increment));
         // turn 45 degree left
         next_poses.push(self.calculate_next_pose(-45.0, distance_increment));
         // turn 22.5 degree left
@@ -337,7 +286,7 @@ impl GeospatialPose {
         // turn 45 degrees right
         next_poses.push(self.calculate_next_pose(45.0, distance_increment));
         // turn 90 degrees right
-        // next_poses.push(self.calculate_next_pose(90.0, distance_increment));
+        next_poses.push(self.calculate_next_pose(90.0, distance_increment));
 
         return next_poses;
     }
@@ -416,13 +365,26 @@ impl GeospatialPose {
     }
 }
 
-/// Calculate chord length
+/// Calculates the chord length of a circle given the arc length and central angle in degrees.
 ///
-/// Fixed wing drone flies on circle arcs. Next position is calculated in a straight line.
-/// *Limitation*: heading range is [-90...90] degrees.
+/// The function requires the central angle to be within [-90, 90] degrees to avoid unrealistic scenarios.
+/// It calculates the chord length using the formula derived from the relationship between the arc length,
+/// the radius of the circle, and the central angle. The angle is first converted from degrees to radians
+/// for the calculation.
 ///
-/// * arc_length: Distance traveled over circle arc.
-/// * angle_degrees: Heading change.
+/// Parameters:
+/// - `arc_length`: The length of the arc subtended by the chord, a positive `f64`.
+/// - `angle_degrees`: The central angle subtending the arc, in degrees, must be within [-90, 90].
+///
+/// Returns:
+/// - The length of the chord as a `f64`.
+///
+/// Panics:
+/// - If `angle_degrees` is not within [-90, 90], indicating an unrealistic heading change.
+///
+/// Example:
+/// Assuming an arc length of 100 units and a central angle of 60 degrees, the function will calculate
+/// the corresponding chord length based on these inputs.
 fn chord_length(arc_length: f64, angle_degrees: f64) -> f64 {
     if angle_degrees > 90.0 || angle_degrees < -90.0 {
         panic!("Heading change out of range!");
@@ -509,6 +471,24 @@ fn simplified_dubins_path(theta: f64, distance: f64) -> f64 {
     arc_length + straight_length
 }
 
+/// Calculates the smallest difference between two headings.
+///
+/// This function determines the minimum angular difference between two headings,
+/// taking into account the circular nature of bearings. Bearings are assumed to be
+/// in degrees, with valid values ranging from 0 to 360 degrees. The function returns
+/// the smallest difference in degrees, which will always be between 0 and 180 degrees,
+/// inclusive. This represents the shortest way to turn from one heading to another.
+///
+/// Parameters:
+/// - `heading1`: The first heading in degrees. Valid values are from 0 to 360.
+/// - `heading2`: The second heading in degrees. Valid values are from 0 to 360.
+///
+/// Returns:
+/// - A `f64` representing the smallest angular difference between the two headings in degrees.
+///
+/// Examples:
+/// - If `heading1` is 350 degrees and `heading2` is 10 degrees, the function will return 20 degrees,
+///   since turning 20 degrees from either heading will align them.
 fn heading_difference(heading1: f64, heading2: f64) -> f64 {
     let diff = (heading1 - heading2).abs();
     if diff > 180.0 {
@@ -521,9 +501,9 @@ fn heading_difference(heading1: f64, heading2: f64) -> f64 {
 /// Checks if a circle and a line (starting from (0,0) and ending at line.end) intersect.
 ///
 /// # Arguments
-/// * `circle_center` - The center of the circle as a geo::Point<f64>.
+/// * `circle_center` - The center of the circle as a `geo::Point<f64>``.
 /// * `radius` - The radius of the circle as an f64.
-/// * `line` - The line as a geo::Line<f64>.
+/// * `line` - The line as a `geo::Line<f64>`.
 ///
 /// # Returns
 /// True if the line segment intersects the circle, false otherwise.
@@ -559,6 +539,21 @@ fn circle_line_intersect(
     (t1 >= 0.0 && t1 <= 1.0) || (t2 >= 0.0 && t2 <= 1.0)
 }
 
+/// Converts geographical points to Cartesian coordinates based on a specified origin using WGS84 geodesic calculations.
+///
+/// Transforms geographical coordinates (latitude, longitude) into Cartesian coordinates (x, y)
+/// relative to a given origin point. This is useful for representing the displacement from the
+/// origin to another point on the Earth's surface in a 2D plane.
+///
+/// Parameters:
+/// - `origin`: Reference to a `geo::Point<f64>` representing the origin point in geographical coordinates.
+/// - `other_point`: Reference to a `geo::Point<f64>` representing the point to transform into Cartesian coordinates.
+///
+/// Returns:
+/// - A tuple `(f64, f64)` representing the Cartesian coordinates (x, y) of `other_point` relative to `origin`.
+///
+/// Note:
+/// The function uses the WGS84 model for Earth to calculate distances and bearings.
 fn transform_geo_to_cartesian_coordinates(
     origin: &geo::Point<f64>,
     other_point: &geo::Point<f64>,
