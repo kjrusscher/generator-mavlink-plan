@@ -2,7 +2,9 @@
 
 pub mod astar_planner;
 pub mod mav_link_plan;
-
+use crate::mav_link_plan::*;
+// use astar_planner::planning_waypoints::{GeospatialPose, Node};
+use astar_planner::AStarPlannerBuilder;
 use iced::widget::{
     checkbox, column, container, pick_list, row, scrollable, text, vertical_space, Button, Column,
     Container, Space, Text, TextInput,
@@ -13,8 +15,6 @@ use serde::Deserialize;
 use std::fs::File;
 use std::io::BufWriter;
 use std::time::Instant;
-
-use crate::mav_link_plan::*;
 
 #[derive(Deserialize)]
 struct WeatherData {
@@ -50,7 +50,7 @@ struct AppPopUpInfo {
     show: bool,
 }
 
-struct AppPathInfo {
+struct AppPlannerInfo {
     drone_position: geo::Point,
     goal_position: Option<geo::Point>,
     optimal_path_from_take_off_to_goal: Vec<geo::Point>,
@@ -63,7 +63,7 @@ struct MavlinkPlanGenerator {
     file_name_drone_and_goal: Option<String>,
     plan_obstacles: Option<MavLinkPlan>,
     file_name_obstacles: Option<String>,
-    path_info: AppPathInfo,
+    path_info: AppPlannerInfo,
     weather_info: AppWeatherInfo,
     pop_up: AppPopUpInfo,
     obstacles_from_drone_and_goal_file: bool,
@@ -101,7 +101,7 @@ impl Sandbox for MavlinkPlanGenerator {
             weather_data: None,
         };
 
-        let geo_info = AppPathInfo {
+        let geo_info = AppPlannerInfo {
             drone_position: geo::Point::new(52.2825397, 6.8984103),
             goal_position: None,
             optimal_path_from_take_off_to_goal: Vec::new(),
@@ -236,36 +236,27 @@ impl Sandbox for MavlinkPlanGenerator {
             }
             Message::PlanRoute => {
                 if let Some(weather_data) = self.weather_info.weather_data.as_ref() {
-                    let start_position = mav_link_plan::get_take_off_waypoint(f64::from(
-                        weather_data.hourly.wind_direction_80m
-                            [self.weather_info.selected_time_index.unwrap()],
-                    ));
                     let start_heading = f64::from(
                         weather_data.hourly.wind_direction_80m
                             [self.weather_info.selected_time_index.unwrap()],
                     );
-                    let end_position = mav_link_plan::get_landing_waypoint(f64::from(
-                        weather_data.hourly.wind_direction_80m
-                            [self.weather_info.selected_time_index.unwrap()],
-                    ));
-                    let end_heading = f64::from(
-                        weather_data.hourly.wind_direction_80m
-                            [self.weather_info.selected_time_index.unwrap()],
-                    );
-                    let checkbox_a_star_planner_drone_and_goal_as_obstacle =
-                        astar_planner::AStarPlanner::new(
-                            &start_position,
-                            start_heading,
-                            &self.path_info.goal_position.as_ref().unwrap(),
-                            &end_position,
-                            end_heading,
-                        );
+                    let start_point = mav_link_plan::get_take_off_waypoint(start_heading);
+                    let end_heading = start_heading;
+                    let end_point = mav_link_plan::get_landing_waypoint(end_heading);
 
-                    match checkbox_a_star_planner_drone_and_goal_as_obstacle {
+                    let mut astar_planner_builder = AStarPlannerBuilder::new()
+                        .start(start_point, start_heading)
+                        .goal(self.path_info.goal_position.as_ref().unwrap())
+                        .end(end_point, end_heading);
+                    if let Some(plan) = self.plan_obstacles.as_ref() {
+                        astar_planner_builder.set_geo_fences(&plan.geoFence);
+                    } else if let Some(plan) = self.plan_drone_and_goal.as_ref() {
+                        astar_planner_builder.set_geo_fences(&plan.geoFence);
+                    }
+                    let a_star_planner_result = astar_planner_builder.build();
+
+                    match a_star_planner_result {
                         Ok(mut a_star_planner) => {
-                            if let Some(plan) = self.plan_obstacles.as_ref() {
-                                a_star_planner.add_geo_fences(&plan.geoFence);
-                            }
                             let start = Instant::now();
                             self.path_info.optimal_path_from_take_off_to_goal =
                                 a_star_planner.get_optimal_path_to_goal();
@@ -275,7 +266,7 @@ impl Sandbox for MavlinkPlanGenerator {
                             println!("Route geplanned in {:.1?}.", duration);
                         }
                         Err(message) => {
-                            self.pop_up.text = message + ". Pas deze waarde aan, aub.";
+                            self.pop_up.text = message.to_string() + ". Pas deze waarde aan, aub.";
                             self.pop_up.show = true;
                         }
                     }
@@ -291,11 +282,11 @@ impl Sandbox for MavlinkPlanGenerator {
                     self.pop_up.text = "Plan eerst een route".to_string();
                     self.pop_up.show = true;
                 } else {
-                    let file_name_drone_and_goal = format!(
+                    let vluchtplan = format!(
                         "vluchtplan_{}.plan",
                         self.weather_info.selected_time.as_ref().unwrap()
                     );
-                    self.save_plan_to_file(&file_name_drone_and_goal);
+                    self.save_plan_to_file(&vluchtplan);
                 }
             }
             Message::PopUpPressed => {
@@ -343,25 +334,15 @@ impl Sandbox for MavlinkPlanGenerator {
                 .on_input(Message::InputDroneLatitudeChanged)
                 .width(Length::Fixed(190.0));
 
-        let input_longitude = TextInput::new(
+        let goal_longitude = TextInput::new(
             "Longitude",
-            &self
-                .path_info
-                .goal_position
-                .unwrap_or_else(|| geo::Point::new(0.0, 0.0))
-                .x()
-                .to_string(),
+            &self.path_info.goal_position.unwrap_or_else(|| geo::Point::new(0.0,0.0)).x().to_string(),
         )
         .on_input(Message::InputGoalLongitudeChanged)
         .width(Length::Fixed(190.0));
-        let input_latitude = TextInput::new(
+        let goal_latitude = TextInput::new(
             "Latitude ",
-            &self
-                .path_info
-                .goal_position
-                .unwrap_or_else(|| geo::Point::new(0.0, 0.0))
-                .y()
-                .to_string(),
+            &self.path_info.goal_position.unwrap_or_else(||geo::Point::new(0.0,0.0)).y().to_string(),
         )
         .on_input(Message::InputGoalLatitudeChanged)
         .width(Length::Fixed(190.0));
@@ -385,7 +366,7 @@ impl Sandbox for MavlinkPlanGenerator {
             text(format!("Doel")).size(24),
             row![
                 column!["Longitude:", vertical_space(10), "Latitude: "].align_items(Alignment::End),
-                column![input_longitude, input_latitude]
+                column![goal_longitude, goal_latitude]
             ]
             .align_items(Alignment::Center),
             vertical_space(30),
@@ -606,9 +587,12 @@ impl MavlinkPlanGenerator {
                 .hourly
                 .wind_direction_80m[self.weather_info.selected_time_index.unwrap()],
         ));
-        plan.add_path(&self.path_info.optimal_path_from_take_off_to_goal);
-        plan.add_goal_position(&self.path_info.goal_position.clone().unwrap());
-        plan.add_path(&self.path_info.optimal_path_from_goal_to_landing);
+        plan.add_path(&self.path_info.optimal_path_from_take_off_to_goal[1..]);
+        plan.add_goal_position(&self.path_info.goal_position.unwrap_or_else(||geo::Point::new(0.0,0.0)));
+        plan.add_path(
+            &self.path_info.optimal_path_from_goal_to_landing
+                [..&self.path_info.optimal_path_from_goal_to_landing.len() - 1],
+        );
         plan.add_landing_sequence(f64::from(
             self.weather_info
                 .weather_data
@@ -617,11 +601,9 @@ impl MavlinkPlanGenerator {
                 .hourly
                 .wind_direction_80m[self.weather_info.selected_time_index.unwrap()],
         ));
-        Notification::new()
-            .summary("Bestand Opgeslagen")
-            .body(&file_name_drone_and_goal)
-            .show()
-            .unwrap();
+        if let Some(source_plan) = self.plan_drone_and_goal.as_ref() {
+            plan.copy_geo_fences(&source_plan);
+        }
 
         // Create a file to save the formatted JSON
         let file = File::create(&file_name_drone_and_goal).expect("Failed to create file");
@@ -629,6 +611,12 @@ impl MavlinkPlanGenerator {
 
         // Serialize and format the data with newlines and indentation
         serde_json::to_writer_pretty(writer, &plan).expect("Failed to write JSON data to file");
+
+        Notification::new()
+            .summary("Bestand Opgeslagen")
+            .body(&file_name_drone_and_goal)
+            .show()
+            .unwrap();
     }
 }
 

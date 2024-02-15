@@ -10,17 +10,16 @@
 use dubins_paths::{DubinsPath, PosRot};
 use geo;
 use geo::algorithm::intersects::Intersects;
-use geo::Contains;
-use geo_types::coord;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::rc::Rc;
 
-use crate::mav_link_plan;
-mod planning_waypoints;
+pub mod planning_waypoints;
 use planning_waypoints::{GeospatialPose, Node};
+mod builder;
+pub use self::builder::AStarPlannerBuilder;
 
 /// Data for the A* planner.
 pub struct AStarPlanner {
@@ -34,107 +33,7 @@ pub struct AStarPlanner {
 }
 
 impl AStarPlanner {
-    /// Builds A* Planner struct
-    ///
-    /// # Arguments
-    /// * `start_location` - Longitude and latitude of point where take off sequence ends as a geo::Point<f64>.
-    /// * `start_heading` - Heading of point where take off sequence ends as an f64.
-    /// * `goal_location` - Longitude and latitude of point where you want to go.
-    /// * `end_location` - Longitude and latitude of point where landing sequence starts as a geo::Point<f64>.
-    /// * `end_heading` - Heading of point where landing sequence starts as an f64.
-    ///
-    /// # Returns
-    /// AStarPlanner struct in a Result<>.
-    pub fn new(
-        start_location: &geo::Point,
-        start_heading: f64,
-        goal_location: &geo::Point,
-        end_location: &geo::Point,
-        end_heading: f64,
-    ) -> Result<Self, String> {
-        let start_pose = GeospatialPose {
-            position: *start_location,
-            height: 120.0,
-            heading: start_heading,
-        };
-        let goal_pose = GeospatialPose {
-            position: *goal_location,
-            height: 120.0,
-            heading: 0.0,
-        };
-        let end_pose = GeospatialPose {
-            position: *end_location,
-            height: 120.0,
-            heading: end_heading,
-        };
-
-        let geo_fence_border = geo::LineString::new(vec![
-            geo::coord! {x:52.28295542244744, y: 6.8565871319299845},
-            geo::coord! {x:52.285431953652584, y: 6.86156240560706},
-            geo::coord! {x:52.2896098479409, y: 6.8688319693996505},
-            geo::coord! {x:52.29227492433401, y: 6.875640979066702},
-            geo::coord! {x:52.2937453230195, y: 6.883632543793112},
-            geo::coord! {x:52.29268600915777, y: 6.888311871426254},
-            geo::coord! {x:52.294277072434966, y: 6.889956775263698},
-            geo::coord! {x:52.293939049265504, y: 6.896312607978928},
-            geo::coord! {x:52.29294882408129, y: 6.902284711120359},
-            geo::coord! {x:52.28900135729954, y: 6.917255476279564},
-            geo::coord! {x:52.2714465433939, y: 6.876881353338064},
-            geo::coord! {x:52.27574362849022, y: 6.869559476902992},
-            geo::coord! {x:52.27691573983945, y: 6.868882808809673},
-            geo::coord! {x:52.27793930785583, y: 6.867776234580788},
-            geo::coord! {x:52.27856267193794, y: 6.865940640293019},
-            geo::coord! {x:52.27956352880396, y: 6.862960555652251},
-            geo::coord! {x:52.281442698183156, y: 6.8598604985957365},
-            // repeat first point to close the loop
-            geo::coord! {x:52.28295542244744, y: 6.8565871319299845},
-        ]);
-        let geo_fence_border_polygon = geo::Polygon::new(geo_fence_border.clone(), vec![]);
-
-        // The start and goal position should be inside the geo_fence
-        if !geo_fence_border_polygon.contains(&start_pose.position) {
-            return Err(String::from("Ongeldige drone positie."));
-        }
-        if !geo_fence_border_polygon.contains(&goal_pose.position) {
-            return Err(String::from("Ongeldige doel positie."));
-        }
-
-        let a_star_planner = AStarPlanner {
-            start_pose: start_pose,
-            goal_pose: goal_pose,
-            end_pose: end_pose,
-            optimal_path_from_start_to_goal: Vec::new(),
-            optimal_path_from_goal_to_end: Vec::new(),
-            geo_fences_polygon: geo::MultiLineString::new(vec![]),
-            geo_fences_circles: vec![],
-        };
-
-        Ok(a_star_planner)
-    }
-
-    /// Read a MavLink GeoFence structure and translate it to geo::Points and geo::LineStrings
-    /// for use by the A* Planner.
-    pub fn add_geo_fences(&mut self, geo_fences: &mav_link_plan::GeoFence) {
-        let mut geo_fence_polygons_vector = vec![];
-        for geo_fence_polygon in geo_fences.polygons.iter() {
-            let mut polygon_vector = vec![];
-            for point in geo_fence_polygon.polygon.iter() {
-                polygon_vector.push(coord! {x: point[0], y: point[1]});
-            }
-            polygon_vector.push(polygon_vector[0]);
-            geo_fence_polygons_vector.push(geo::LineString::new(polygon_vector));
-        }
-        self.geo_fences_polygon = geo::MultiLineString::new(geo_fence_polygons_vector);
-
-        for geo_fence_circle in geo_fences.circles.iter() {
-            self.geo_fences_circles.push(geo::Point::new(
-                geo_fence_circle.circle.center[0],
-                geo_fence_circle.circle.center[1],
-            ));
-        }
-    }
-
-    /// Calculate path from position and orientation of begin_pose to the position of the end_pose.
+     /// Calculate path from position and orientation of begin_pose to the position of the end_pose.
     /// This does not take the end orientation into account.
     fn calculate_path(
         &self,
@@ -305,7 +204,7 @@ impl GeospatialPose {
             GeospatialPose {
                 position: point_straight_ahead,
                 heading: self.heading,
-                height: 120.0,
+                height: 115.0,
             }
         } else {
             let delta_movement_direction = delta_heading / 2.0;
@@ -324,7 +223,7 @@ impl GeospatialPose {
             GeospatialPose {
                 position: point_left_90,
                 heading: new_heading,
-                height: 120.0,
+                height: 115.0,
             }
         }
     }
