@@ -46,24 +46,24 @@ impl AStarPlanner {
     /// # Returns
     /// AStarPlanner struct in a Result<>.
     pub fn new(
-        start_location: geo::Point,
+        start_location: &geo::Point,
         start_heading: f64,
-        goal_location: geo::Point,
-        end_location: geo::Point,
+        goal_location: &geo::Point,
+        end_location: &geo::Point,
         end_heading: f64,
     ) -> Result<Self, String> {
         let start_pose = GeospatialPose {
-            position: start_location,
+            position: *start_location,
             height: 120.0,
             heading: start_heading,
         };
         let goal_pose = GeospatialPose {
-            position: goal_location,
+            position: *goal_location,
             height: 120.0,
             heading: 0.0,
         };
         let end_pose = GeospatialPose {
-            position: end_location,
+            position: *end_location,
             height: 120.0,
             heading: end_heading,
         };

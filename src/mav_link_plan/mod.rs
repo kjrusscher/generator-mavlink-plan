@@ -61,7 +61,7 @@ pub struct RallyPoints {
 pub struct MavLinkSimpleItem {
     pub AMSLAltAboveTerrain: Option<i32>,
     pub Altitude: Option<i32>,
-    pub AltitudeMode: i32,
+    pub AltitudeMode: Option<i32>,
     pub MISSION_ITEM_ID: Option<String>,
     pub autoContinue: bool,
     pub command: MavCmd,
@@ -101,7 +101,7 @@ impl Default for MavLinkSimpleItem {
         let item = MavLinkSimpleItem {
             AMSLAltAboveTerrain: Some(120),
             Altitude: Some(120),
-            AltitudeMode: 1,
+            AltitudeMode: Some(1),
             MISSION_ITEM_ID: None,
             autoContinue: true,
             command: MavCmd::MAV_CMD_NAV_WAYPOINT,
