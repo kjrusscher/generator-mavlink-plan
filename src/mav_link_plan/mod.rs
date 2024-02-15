@@ -1,6 +1,6 @@
 //! Data structs for the .plan file
 use geo;
-// use geographiclib_rs::{DirectGeodesic, Geodesic};
+use geographiclib_rs::{DirectGeodesic, Geodesic};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -18,14 +18,14 @@ pub enum MavCmd {
 }
 
 /// Used in GeoFenceCirle
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Circle {
     pub center: [f64; 2],
     pub radius: f64,
 }
 
 /// Used in GeoFence
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GeoFenceCircle {
     pub circle: Circle,
     pub inclusion: bool,
@@ -33,7 +33,7 @@ pub struct GeoFenceCircle {
 }
 
 /// Used in GeoFence
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GeoFencePolygon {
     pub inclusion: bool,
     pub polygon: Vec<[f64; 2]>,
@@ -41,7 +41,7 @@ pub struct GeoFencePolygon {
 }
 
 /// Used in MavLinkPlan
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GeoFence {
     pub circles: Vec<GeoFenceCircle>,
     pub polygons: Vec<GeoFencePolygon>,
@@ -61,7 +61,7 @@ pub struct RallyPoints {
 pub struct MavLinkSimpleItem {
     pub AMSLAltAboveTerrain: Option<i32>,
     pub Altitude: Option<i32>,
-    pub AltitudeMode: i32,
+    pub AltitudeMode: Option<i32>,
     pub MISSION_ITEM_ID: Option<String>,
     pub autoContinue: bool,
     pub command: MavCmd,
@@ -101,7 +101,7 @@ impl Default for MavLinkSimpleItem {
         let item = MavLinkSimpleItem {
             AMSLAltAboveTerrain: Some(120),
             Altitude: Some(120),
-            AltitudeMode: 1,
+            AltitudeMode: Some(1),
             MISSION_ITEM_ID: None,
             autoContinue: true,
             command: MavCmd::MAV_CMD_NAV_WAYPOINT,
@@ -266,118 +266,85 @@ impl Default for MavLinkPlan {
 }
 
 impl MavLinkPlan {
-    pub fn new(wind_direction_10m: i32) -> Self {
+    pub fn new() -> Self {
         let mut plan = MavLinkPlan::default();
 
-        let direction_take_off = f64::from(wind_direction_10m);
-
-        // let position_pilot = geo::Point::new(52.282418448042776, 6.898363269759585);
-        let home_position_drone = geo::Point::new(52.282538406253, 6.898364382855505);
-
-        plan.add_take_off_sequence(direction_take_off, home_position_drone);
+        plan.mission.plannedHomePosition = [52.2825397, 6.8984103, 40.44];
 
         plan
     }
 
-    fn add_take_off_sequence(&mut self, direction_take_off: f64, home_position_drone: geo::Point) {
-        // let geod = Geodesic::wgs84();
-
+    pub fn add_take_off_sequence(&mut self, wind_direction: f64) {
         self.add_special_waypoint(
             Some(30),
             MavCmd::MAV_CMD_NAV_TAKEOFF,
             [
-                Some(15.0),
                 Some(0.0),
                 Some(0.0),
-                Some(direction_take_off),
-                Some(home_position_drone.x()),
-                Some(home_position_drone.y()),
-                Some(30.0),
+                Some(0.0),
+                None,
+                Some(self.mission.plannedHomePosition[0]),
+                Some(self.mission.plannedHomePosition[1]),
+                Some(17.0),
             ],
         );
 
-        // let (mut lat, mut lon) =
-        //     geod.direct(home_position_drone.x(), home_position_drone.y(), 30.0, 35.0);
-        // let vtol_transition = geo::Point::new(lat, lon);
-        // self.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
+        self.add_waypoint(30, 52.282666320797524, 6.898523816647838);
+        self.add_waypoint(60, 52.282812822205244, 6.899070950501141);
 
-        // self.add_special_waypoint(
-        //     None,
-        //     MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
-        //     [
-        //         Some(4.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //         Some(0.0),
-        //     ],
-        // );
+        self.add_special_waypoint(
+            None,
+            MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
+            [
+                Some(4.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+            ],
+        );
 
-        // (lat, lon) = geod.direct(
-        //     vtol_transition.x(),
-        //     vtol_transition.y(),
-        //     direction_take_off,
-        //     210.0,
-        // );
-        // let current_point = geo::Point::new(lat, lon);
-        // self.add_waypoint(60, current_point.x(), current_point.y());
+        let last_waypoint = get_take_off_waypoint(wind_direction);
+        self.add_waypoint(60, last_waypoint.x(), last_waypoint.y());
     }
 
-    // fn add_landing_sequence(&mut self, direction_take_off: f64, home_position_drone: geo::Point) {
-    //     let geod = Geodesic::wgs84();
+    pub fn add_landing_sequence(&mut self, wind_direction: f64) {
+        let first_waypoint = get_landing_waypoint(wind_direction);
+        self.add_waypoint(60, first_waypoint.x(), first_waypoint.y());
 
-    //     let direction_landing: f64;
-    //     if direction_take_off < 180.0 {
-    //         direction_landing = direction_take_off + 180.0;
-    //     } else {
-    //         direction_landing = direction_take_off - 180.0;
-    //     }
+        self.add_special_waypoint(
+            None,
+            MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
+            [
+                Some(3.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+            ],
+        );
 
-    //     let (mut lat, mut lon) =
-    //         geod.direct(home_position_drone.x(), home_position_drone.y(), 30.0, 35.0);
-    //     let vtol_transition = geo::Point::new(lat, lon);
+        self.add_waypoint(60, 52.282812822205244, 6.899070950501141);
+        self.add_waypoint(30, 52.282666320797524, 6.898523816647838);
 
-    //     (lat, lon) = geod.direct(
-    //         vtol_transition.x(),
-    //         vtol_transition.y(),
-    //         direction_landing,
-    //         210.0,
-    //     );
-    //     let current_point = geo::Point::new(lat, lon);
-    //     self.add_waypoint(60, current_point.x(), current_point.y());
-
-    //     self.add_waypoint(60, vtol_transition.x(), vtol_transition.y());
-
-    //     self.add_special_waypoint(
-    //         None,
-    //         MavCmd::MAV_CMD_DO_VTOL_TRANSITION,
-    //         [
-    //             Some(3.0),
-    //             Some(0.0),
-    //             Some(0.0),
-    //             Some(0.0),
-    //             Some(0.0),
-    //             Some(0.0),
-    //             Some(0.0),
-    //         ],
-    //     );
-
-    //     self.add_special_waypoint(
-    //         Some(0),
-    //         MavCmd::MAV_CMD_NAV_LAND,
-    //         [
-    //             Some(0.0),
-    //             Some(1.0),
-    //             Some(0.0),
-    //             None,
-    //             Some(home_position_drone.x()),
-    //             Some(home_position_drone.y()),
-    //             Some(0.0),
-    //         ],
-    //     );
-    // }
+        self.add_special_waypoint(
+            Some(0),
+            MavCmd::MAV_CMD_NAV_LAND,
+            [
+                Some(0.0),
+                Some(1.0),
+                Some(0.0),
+                None,
+                Some(self.mission.plannedHomePosition[0]),
+                Some(self.mission.plannedHomePosition[1]),
+                Some(0.0),
+            ],
+        );
+    }
 
     pub fn add_path(&mut self, path: &Vec<geo::Point>) {
         for point in path.iter() {
@@ -438,5 +405,46 @@ impl MavLinkPlan {
         waypoint.params = params;
 
         self.mission.items.push(waypoint);
+    }
+}
+
+/// Get last waypoint of take off sequence
+pub fn get_take_off_waypoint(wind_direction: f64) -> geo::Point<f64> {
+    let geod = Geodesic::wgs84();
+    let (lat, lon) = geod.direct(
+        52.282812822205244,
+        6.899070950501141,
+        adjust_wind_direction(wind_direction),
+        210.0,
+    );
+    geo::Point::new(lat, lon)
+}
+
+/// Get first waypoint of landings sequence
+pub fn get_landing_waypoint(wind_direction: f64) -> geo::Point<f64> {
+    let landing_direction = if wind_direction <= 180.0 {
+        wind_direction + 180.0
+    } else {
+        wind_direction - 180.0
+    };
+    let geod = Geodesic::wgs84();
+    let (lat, lon) = geod.direct(
+        52.282812822205244,
+        6.899070950501141,
+        adjust_wind_direction(landing_direction),
+        210.0,
+    );
+    geo::Point::new(lat, lon)
+}
+
+fn adjust_wind_direction(wind_direction: f64) -> f64 {
+    if wind_direction > 90.0 && wind_direction < 200.0 {
+        if wind_direction < 180.0 {
+            wind_direction + 180.0
+        } else {
+            wind_direction - 180.0
+        }
+    } else {
+        wind_direction
     }
 }
