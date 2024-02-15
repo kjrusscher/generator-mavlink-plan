@@ -185,7 +185,7 @@ impl MavLinkPlan {
         plan
     }
 
-    pub fn add_take_off_sequence(&mut self, wind_direction: f64) {
+    pub fn add_take_off_sequence(mut self, wind_direction: f64) -> Self {
         self.add_special_waypoint(
             Some(30),
             MavCmd::MAV_CMD_NAV_TAKEOFF,
@@ -219,9 +219,11 @@ impl MavLinkPlan {
 
         let last_waypoint = get_take_off_waypoint(wind_direction);
         self.add_waypoint(60, last_waypoint.x(), last_waypoint.y());
+
+        self
     }
 
-    pub fn add_landing_sequence(&mut self, wind_direction: f64) {
+    pub fn add_landing_sequence(mut self, wind_direction: f64) -> Self {
         let first_waypoint = get_landing_waypoint(wind_direction);
         self.add_waypoint(60, first_waypoint.x(), first_waypoint.y());
 
@@ -255,16 +257,19 @@ impl MavLinkPlan {
                 Some(0.0),
             ],
         );
+
+        self
     }
 
-    pub fn add_path(&mut self, path: &[geo::Point]) {
+    pub fn add_path(mut self, path: &[geo::Point]) -> Self {
         for point in path.iter() {
             self.add_waypoint(115, point.x(), point.y());
         }
+        self
     }
 
     /// Add goal position as loiter point.
-    pub fn add_goal_position(&mut self, goal: &geo::Point) {
+    pub fn add_goal_position(mut self, goal: &geo::Point) -> Self {
         self.add_special_waypoint(
             Some(115),
             MavCmd::MAV_CMD_NAV_LOITER_UNLIM,
@@ -278,6 +283,7 @@ impl MavLinkPlan {
                 Some(115.0),
             ],
         );
+        self
     }
 
     fn add_waypoint(&mut self, height: i32, latitude: f64, longitude: f64) {

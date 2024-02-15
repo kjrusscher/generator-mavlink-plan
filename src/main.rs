@@ -336,13 +336,23 @@ impl Sandbox for MavlinkPlanGenerator {
 
         let goal_longitude = TextInput::new(
             "Longitude",
-            &self.path_info.goal_position.unwrap_or_else(|| geo::Point::new(0.0,0.0)).x().to_string(),
+            &self
+                .path_info
+                .goal_position
+                .unwrap_or_else(|| geo::Point::new(0.0, 0.0))
+                .x()
+                .to_string(),
         )
         .on_input(Message::InputGoalLongitudeChanged)
         .width(Length::Fixed(190.0));
         let goal_latitude = TextInput::new(
             "Latitude ",
-            &self.path_info.goal_position.unwrap_or_else(||geo::Point::new(0.0,0.0)).y().to_string(),
+            &self
+                .path_info
+                .goal_position
+                .unwrap_or_else(|| geo::Point::new(0.0, 0.0))
+                .y()
+                .to_string(),
         )
         .on_input(Message::InputGoalLatitudeChanged)
         .width(Length::Fixed(190.0));
@@ -578,29 +588,35 @@ impl Sandbox for MavlinkPlanGenerator {
 
 impl MavlinkPlanGenerator {
     fn save_plan_to_file(&mut self, file_name_drone_and_goal: &String) {
-        let mut plan: MavLinkPlan = MavLinkPlan::new();
-        plan.add_take_off_sequence(f64::from(
-            self.weather_info
-                .weather_data
-                .as_ref()
-                .unwrap()
-                .hourly
-                .wind_direction_80m[self.weather_info.selected_time_index.unwrap()],
-        ));
-        plan.add_path(&self.path_info.optimal_path_from_take_off_to_goal[1..]);
-        plan.add_goal_position(&self.path_info.goal_position.unwrap_or_else(||geo::Point::new(0.0,0.0)));
-        plan.add_path(
-            &self.path_info.optimal_path_from_goal_to_landing
-                [..&self.path_info.optimal_path_from_goal_to_landing.len() - 1],
-        );
-        plan.add_landing_sequence(f64::from(
-            self.weather_info
-                .weather_data
-                .as_ref()
-                .unwrap()
-                .hourly
-                .wind_direction_80m[self.weather_info.selected_time_index.unwrap()],
-        ));
+        let mut plan: MavLinkPlan = MavLinkPlan::new()
+            .add_take_off_sequence(f64::from(
+                self.weather_info
+                    .weather_data
+                    .as_ref()
+                    .unwrap()
+                    .hourly
+                    .wind_direction_80m[self.weather_info.selected_time_index.unwrap()],
+            ))
+            .add_path(&self.path_info.optimal_path_from_take_off_to_goal[1..])
+            .add_goal_position(
+                &self
+                    .path_info
+                    .goal_position
+                    .unwrap_or_else(|| geo::Point::new(0.0, 0.0)),
+            )
+            .add_path(
+                &self.path_info.optimal_path_from_goal_to_landing
+                    [..&self.path_info.optimal_path_from_goal_to_landing.len() - 1],
+            )
+            .add_landing_sequence(f64::from(
+                self.weather_info
+                    .weather_data
+                    .as_ref()
+                    .unwrap()
+                    .hourly
+                    .wind_direction_80m[self.weather_info.selected_time_index.unwrap()],
+            ));
+            
         if let Some(source_plan) = self.plan_drone_and_goal.as_ref() {
             plan.copy_geo_fences(&source_plan);
         }
