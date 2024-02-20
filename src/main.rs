@@ -264,7 +264,11 @@ impl Sandbox for MavlinkPlanGenerator {
                             self.path_info.optimal_path_from_goal_to_landing =
                                 a_star_planner.get_optimal_path_from_goal();
                             let duration = start.elapsed();
-                            println!("Route geplanned in {:.1?}.", duration);
+                            Notification::new()
+                            .summary("Route klaar")
+                            .body(format!("Route geplanned in {:.2?}", duration).as_str())
+                            .show()
+                            .unwrap();
                         }
                         Err(message) => {
                             self.pop_up.text = message.to_string() + ". Pas deze waarde aan, aub.";
@@ -522,16 +526,15 @@ impl Sandbox for MavlinkPlanGenerator {
         .align_items(Alignment::Center)
         .spacing(10);
 
-        let button_astar_enabled: Option<Message>;
-        if self.weather_info.selected_time.is_some()
+        let button_astar_enabled = if self.weather_info.selected_time.is_some()
             && self.path_info.goal_position.is_some()
-            && (!self.obstacles_from_drone_and_goal_file && self.plan_obstacles.is_some())
-            || (self.obstacles_from_drone_and_goal_file && self.plan_obstacles.is_none())
+            && ((!self.obstacles_from_drone_and_goal_file && self.plan_obstacles.is_some())
+                || (self.obstacles_from_drone_and_goal_file && self.plan_obstacles.is_none()))
         {
-            button_astar_enabled = Some(Message::PlanRoute);
+            Some(Message::PlanRoute)
         } else {
-            button_astar_enabled = None;
-        }
+            None
+        };
         let button_astar = Button::new("Plan Route").on_press_maybe(button_astar_enabled);
         let button_save_enabled: Option<Message>;
         if self.weather_info.selected_time.is_some()
