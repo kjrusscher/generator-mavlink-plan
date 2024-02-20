@@ -1,3 +1,17 @@
+# How to use
+## For Ubuntu 20.04
+```
+docker-compose up build-for-20.04
+```
+This results in executable plan-generator-20-04.
+## For Ubuntu 22.04
+```
+docker-compose up build-for-22.04
+```
+This results in executable plan-generator-22-04.
+
+# Other documentation
+## Avy Parameters
 | Parameter | Value |
 |-----------------|----------:|
 | Maximum yaw rate | 45 deg/s |
@@ -15,8 +29,6 @@
 | Nominal cruise airspeed | 28 m/s (101 km/h) |
 | Max cruise airspeed | 32 m/s (115 km/h) |
 | Never exceed airspeed | 35 m/s (126 km/h) |
-
-SkyOps
 
 ## A*
 
