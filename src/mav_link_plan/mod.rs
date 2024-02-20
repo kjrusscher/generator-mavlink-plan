@@ -346,17 +346,10 @@ pub fn get_take_off_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
 
 /// Get first waypoint of landings sequence
 pub fn get_landing_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
-    let (direction_landing_point, is_direction_adjusted) = if wind_direction <= 180.0 {
-        adjust_wind_direction(wind_direction + 180.0)
-    } else {
-        adjust_wind_direction(wind_direction - 180.0)
-    };
+    let (direction_landing_point, is_direction_adjusted) =
+        adjust_wind_direction(calculate_opposite_wind_direction(wind_direction));
     let landing_direction = if is_direction_adjusted {
-        if wind_direction > 180.0 {
-            wind_direction - 180.0
-        } else {
-            wind_direction + 180.0
-        }
+        calculate_opposite_wind_direction(wind_direction)
     } else {
         wind_direction
     };
@@ -373,12 +366,40 @@ pub fn get_landing_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
 
 fn adjust_wind_direction(wind_direction: f64) -> (f64, bool) {
     if wind_direction > 90.0 && wind_direction < 200.0 {
-        if wind_direction < 180.0 {
-            (wind_direction + 180.0, true)
-        } else {
-            (wind_direction - 180.0, true)
-        }
+        (calculate_opposite_wind_direction(wind_direction), true)
     } else {
         (wind_direction, false)
+    }
+}
+
+/// Calculates the opposite wind direction.
+///
+/// Given a wind direction in degrees, this function computes its opposite.
+/// The wind direction is expected to be a value between 0 and 360 degrees,
+/// where 0 or 360 represents North, 90 represents East, 180 represents South,
+/// and 270 represents West. The opposite wind direction is calculated by
+/// adding or subtracting 180 degrees, ensuring the result stays within the
+/// 0 to 360 degrees range.
+///
+/// # Arguments
+///
+/// * `wind_direction` - A floating-point number representing the current wind direction in degrees.
+///
+/// # Returns
+///
+/// A floating-point number representing the opposite wind direction in degrees.
+///
+/// # Examples
+///
+/// ```
+/// let current_wind_direction = 190.0;
+/// let opposite_wind_direction = calculate_opposite_wind_direction(current_wind_direction);
+/// assert_eq!(opposite_wind_direction, 10.0);
+/// ```
+fn calculate_opposite_wind_direction(wind_direction: f64) -> f64 {
+    if wind_direction > 180.0 {
+        wind_direction - 180.0
+    } else {
+        wind_direction + 180.0
     }
 }
