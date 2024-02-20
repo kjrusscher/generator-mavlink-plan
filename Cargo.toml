@@ -15,7 +15,6 @@ reqwest = { version = "0.11", features = ["json", "blocking"] }
 notify-rust = "4.9"
 geo = "0.26"
 geo-types = { version = "0.7", features = ["serde"]}
-#proj = "0.27"
 proj = "0.25"
 geographiclib-rs = "0.2"
 dubins_paths = "2.1"
