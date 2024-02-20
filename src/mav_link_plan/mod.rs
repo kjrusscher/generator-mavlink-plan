@@ -132,9 +132,9 @@ impl Default for MavLinkSimpleItem {
                 Some(0.0),
                 Some(0.0),
                 None,
-                Some(52.2825397),
-                Some(6.8984103),
-                Some(120.0),
+                None,
+                None,
+                Some(115.0),
             ],
             type_name: String::from("SimpleItem"),
         };
@@ -177,15 +177,16 @@ impl Default for MavLinkPlan {
 }
 
 impl MavLinkPlan {
-    pub fn new() -> Self {
+    pub fn new(planned_home: [f64; 3]) -> Self {
         let mut plan = MavLinkPlan::default();
 
-        plan.mission.plannedHomePosition = [52.2825397, 6.8984103, 40.44];
+        // plan.mission.plannedHomePosition = [52.2825397, 6.8984103, 40.44];
+        plan.mission.plannedHomePosition = planned_home;
 
         plan
     }
 
-    pub fn add_take_off_sequence(mut self, wind_direction: f64) -> Self {
+    pub fn add_take_off_sequence(mut self, wind_direction: f64, home_position: geo::Point) -> Self {
         self.add_special_waypoint(
             Some(30),
             MavCmd::MAV_CMD_NAV_TAKEOFF,
@@ -194,14 +195,18 @@ impl MavLinkPlan {
                 Some(0.0),
                 Some(0.0),
                 None,
-                Some(self.mission.plannedHomePosition[0]),
-                Some(self.mission.plannedHomePosition[1]),
+                Some(home_position.x()),
+                Some(home_position.y()),
                 Some(17.0),
             ],
         );
 
-        self.add_waypoint(30, 52.282666320797524, 6.898523816647838);
-        self.add_waypoint(60, 52.282812822205244, 6.899070950501141);
+        let vtol_transition_position = calculate_vtol_transistion_position(home_position);
+        self.add_waypoint(
+            60,
+            vtol_transition_position.x(),
+            vtol_transition_position.y(),
+        );
 
         self.add_special_waypoint(
             None,
@@ -217,14 +222,14 @@ impl MavLinkPlan {
             ],
         );
 
-        let (last_waypoint, _) = get_take_off_waypoint(wind_direction);
+        let (last_waypoint, _) = get_take_off_waypoint(wind_direction, home_position);
         self.add_waypoint(60, last_waypoint.x(), last_waypoint.y());
 
         self
     }
 
-    pub fn add_landing_sequence(mut self, wind_direction: f64) -> Self {
-        let (first_waypoint, _) = get_landing_waypoint(wind_direction);
+    pub fn add_landing_sequence(mut self, wind_direction: f64, home_position: geo::Point) -> Self {
+        let (first_waypoint, _) = get_landing_waypoint(wind_direction, home_position);
         self.add_waypoint(60, first_waypoint.x(), first_waypoint.y());
 
         self.add_special_waypoint(
@@ -241,8 +246,12 @@ impl MavLinkPlan {
             ],
         );
 
-        self.add_waypoint(60, 52.282812822205244, 6.899070950501141);
-        self.add_waypoint(30, 52.282666320797524, 6.898523816647838);
+        let vtol_transition_position = calculate_vtol_transistion_position(home_position);
+        self.add_waypoint(
+            60,
+            vtol_transition_position.x(),
+            vtol_transition_position.y(),
+        );
 
         self.add_special_waypoint(
             Some(0),
@@ -252,8 +261,8 @@ impl MavLinkPlan {
                 Some(1.0),
                 Some(0.0),
                 None,
-                Some(self.mission.plannedHomePosition[0]),
-                Some(self.mission.plannedHomePosition[1]),
+                Some(home_position.x()),
+                Some(home_position.y()),
                 Some(0.0),
             ],
         );
@@ -330,14 +339,18 @@ impl MavLinkPlan {
 }
 
 /// Get last waypoint of take off sequence
-pub fn get_take_off_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
+pub fn get_take_off_waypoint(
+    wind_direction: f64,
+    home_position: geo::Point,
+) -> (geo::Point<f64>, f64) {
     let (direction_take_off_point, _) = adjust_wind_direction(wind_direction);
     let (take_off_direction, _) = adjust_wind_direction(wind_direction);
 
+    let vtol_transition_position = calculate_vtol_transistion_position(home_position);
     let geod = Geodesic::wgs84();
     let (lat, lon) = geod.direct(
-        52.282812822205244,
-        6.899070950501141,
+        vtol_transition_position.x(),
+        vtol_transition_position.y(),
         direction_take_off_point,
         210.0,
     );
@@ -345,7 +358,10 @@ pub fn get_take_off_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
 }
 
 /// Get first waypoint of landings sequence
-pub fn get_landing_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
+pub fn get_landing_waypoint(
+    wind_direction: f64,
+    home_position: geo::Point,
+) -> (geo::Point<f64>, f64) {
     let (direction_landing_point, is_direction_adjusted) =
         adjust_wind_direction(calculate_opposite_wind_direction(wind_direction));
     let landing_direction = if is_direction_adjusted {
@@ -354,10 +370,11 @@ pub fn get_landing_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
         wind_direction
     };
 
+    let vtol_transition_position = calculate_vtol_transistion_position(home_position);
     let geod = Geodesic::wgs84();
     let (lat, lon) = geod.direct(
-        52.282812822205244,
-        6.899070950501141,
+        vtol_transition_position.x(),
+        vtol_transition_position.y(),
         direction_landing_point,
         210.0,
     );
@@ -402,4 +419,10 @@ fn calculate_opposite_wind_direction(wind_direction: f64) -> f64 {
     } else {
         wind_direction + 180.0
     }
+}
+
+fn calculate_vtol_transistion_position(home_position: geo::Point) -> geo::Point {
+    let geod = Geodesic::wgs84();
+    let (lat, lon) = geod.direct(home_position.x(), home_position.y(), 50.0, 43.0);
+    geo::Point::new(lat, lon)
 }
