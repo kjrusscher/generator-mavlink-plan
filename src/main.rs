@@ -240,9 +240,10 @@ impl Sandbox for MavlinkPlanGenerator {
                         weather_data.hourly.wind_direction_80m
                             [self.weather_info.selected_time_index.unwrap()],
                     );
-                    let start_point = mav_link_plan::get_take_off_waypoint(start_heading);
                     let end_heading = start_heading;
-                    let end_point = mav_link_plan::get_landing_waypoint(end_heading);
+                    let (start_point, start_heading) =
+                        mav_link_plan::get_take_off_waypoint(start_heading);
+                    let (end_point, end_heading) = mav_link_plan::get_landing_waypoint(end_heading);
 
                     let mut astar_planner_builder = AStarPlannerBuilder::new()
                         .start(start_point, start_heading)
@@ -616,7 +617,7 @@ impl MavlinkPlanGenerator {
                     .hourly
                     .wind_direction_80m[self.weather_info.selected_time_index.unwrap()],
             ));
-            
+
         if let Some(source_plan) = self.plan_drone_and_goal.as_ref() {
             plan.copy_geo_fences(&source_plan);
         }

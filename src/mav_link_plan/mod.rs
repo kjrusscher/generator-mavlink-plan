@@ -217,14 +217,14 @@ impl MavLinkPlan {
             ],
         );
 
-        let last_waypoint = get_take_off_waypoint(wind_direction);
+        let (last_waypoint, _) = get_take_off_waypoint(wind_direction);
         self.add_waypoint(60, last_waypoint.x(), last_waypoint.y());
 
         self
     }
 
     pub fn add_landing_sequence(mut self, wind_direction: f64) -> Self {
-        let first_waypoint = get_landing_waypoint(wind_direction);
+        let (first_waypoint, _) = get_landing_waypoint(wind_direction);
         self.add_waypoint(60, first_waypoint.x(), first_waypoint.y());
 
         self.add_special_waypoint(
@@ -330,42 +330,55 @@ impl MavLinkPlan {
 }
 
 /// Get last waypoint of take off sequence
-pub fn get_take_off_waypoint(wind_direction: f64) -> geo::Point<f64> {
+pub fn get_take_off_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
+    let (direction_take_off_point, _) = adjust_wind_direction(wind_direction);
+    let (take_off_direction, _) = adjust_wind_direction(wind_direction);
+
     let geod = Geodesic::wgs84();
     let (lat, lon) = geod.direct(
         52.282812822205244,
         6.899070950501141,
-        adjust_wind_direction(wind_direction),
+        direction_take_off_point,
         210.0,
     );
-    geo::Point::new(lat, lon)
+    (geo::Point::new(lat, lon), take_off_direction)
 }
 
 /// Get first waypoint of landings sequence
-pub fn get_landing_waypoint(wind_direction: f64) -> geo::Point<f64> {
-    let landing_direction = if wind_direction <= 180.0 {
-        wind_direction + 180.0
+pub fn get_landing_waypoint(wind_direction: f64) -> (geo::Point<f64>, f64) {
+    let (direction_landing_point, is_direction_adjusted) = if wind_direction <= 180.0 {
+        adjust_wind_direction(wind_direction + 180.0)
     } else {
-        wind_direction - 180.0
+        adjust_wind_direction(wind_direction - 180.0)
     };
+    let landing_direction = if is_direction_adjusted {
+        if wind_direction > 180.0 {
+            wind_direction - 180.0
+        } else {
+            wind_direction + 180.0
+        }
+    } else {
+        wind_direction
+    };
+
     let geod = Geodesic::wgs84();
     let (lat, lon) = geod.direct(
         52.282812822205244,
         6.899070950501141,
-        adjust_wind_direction(landing_direction),
+        direction_landing_point,
         210.0,
     );
-    geo::Point::new(lat, lon)
+    (geo::Point::new(lat, lon), landing_direction)
 }
 
-fn adjust_wind_direction(wind_direction: f64) -> f64 {
+fn adjust_wind_direction(wind_direction: f64) -> (f64, bool) {
     if wind_direction > 90.0 && wind_direction < 200.0 {
         if wind_direction < 180.0 {
-            wind_direction + 180.0
+            (wind_direction + 180.0, true)
         } else {
-            wind_direction - 180.0
+            (wind_direction - 180.0, true)
         }
     } else {
-        wind_direction
+        (wind_direction, false)
     }
 }

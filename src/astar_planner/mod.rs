@@ -33,7 +33,7 @@ pub struct AStarPlanner {
 }
 
 impl AStarPlanner {
-     /// Calculate path from position and orientation of begin_pose to the position of the end_pose.
+    /// Calculate path from position and orientation of begin_pose to the position of the end_pose.
     /// This does not take the end orientation into account.
     fn calculate_path(
         &self,
@@ -150,7 +150,12 @@ impl AStarPlanner {
 
     pub fn get_optimal_path_from_goal(&mut self) -> Vec<geo::Point> {
         let mut node_inverse_heading = self.end_pose.clone();
-        node_inverse_heading.heading += 180.0;
+        node_inverse_heading.heading = if node_inverse_heading.heading > 180.0 {
+            node_inverse_heading.heading - 180.0
+        } else {
+            node_inverse_heading.heading + 180.0
+        };
+
         self.optimal_path_from_goal_to_end =
             self.calculate_path(&node_inverse_heading, &self.goal_pose);
 
