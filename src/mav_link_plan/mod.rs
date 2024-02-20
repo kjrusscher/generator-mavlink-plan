@@ -423,6 +423,6 @@ fn calculate_opposite_wind_direction(wind_direction: f64) -> f64 {
 
 fn calculate_vtol_transistion_position(home_position: geo::Point) -> geo::Point {
     let geod = Geodesic::wgs84();
-    let (lat, lon) = geod.direct(home_position.x(), home_position.y(), 50.0, 43.0);
+    let (lat, lon) = geod.direct(home_position.x(), home_position.y(), 60.0, 50.0);
     geo::Point::new(lat, lon)
 }
