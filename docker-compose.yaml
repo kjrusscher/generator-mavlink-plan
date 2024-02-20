@@ -1,0 +1,24 @@
+version: '2.19'
+
+services:
+  build-for-20.04:
+    image: generator-mavlink-plan:20.04
+    build:
+      context: .
+      dockerfile: compile.20.04.Dockerfile
+    # network_mode: host
+    volumes:
+      - ${PWD}:/home/generator-mavlink-plan:rw
+    command: >
+      /bin/bash -c "cd /home/generator-mavlink-plan/ && cargo build --release  && cp ./target/release/generator-mavlink-plan ./plan-generator-20-04"
+
+  build-for-22.04:
+    image: generator-mavlink-plan:22.04
+    build:
+      context: .
+      dockerfile: compile.22.04.Dockerfile
+    # network_mode: host
+    volumes:
+      - ${PWD}:/home/generator-mavlink-plan:rw
+    command: >
+      /bin/bash -c "cd /home/generator-mavlink-plan/ && cargo build --release && cp ./target/release/generator-mavlink-plan ./plan-generator-22-04"
