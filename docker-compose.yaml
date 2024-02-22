@@ -6,19 +6,23 @@ services:
     build:
       context: .
       dockerfile: compile.20.04.Dockerfile
-    # network_mode: host
+    working_dir: /home/generator-mavlink-plan/
     volumes:
-      - ${PWD}:/home/generator-mavlink-plan:rw
+      - ${PWD}/generated-executables:/home/generator-mavlink-plan/generated-executables:rw
     command: >
-      /bin/bash -c "cd /home/generator-mavlink-plan/ && cargo build --release  && cp ./target/release/generator-mavlink-plan ./plan-generator-20-04"
+      /bin/bash -c "cargo add proj@0.14;
+                    cargo build --release;
+                    cp ./target/release/generator-mavlink-plan ./generated-executables/flight-route-planner-20"
 
   build-for-22.04:
     image: generator-mavlink-plan:22.04
     build:
       context: .
       dockerfile: compile.22.04.Dockerfile
-    # network_mode: host
+    working_dir: /home/generator-mavlink-plan/
     volumes:
-      - ${PWD}:/home/generator-mavlink-plan:rw
+      - ${PWD}/generated-executables:/home/generator-mavlink-plan/generated-executables:rw
     command: >
-      /bin/bash -c "cd /home/generator-mavlink-plan/ && cargo build --release && cp ./target/release/generator-mavlink-plan ./plan-generator-22-04"
+      /bin/bash -c "cargo add proj@0.25;
+                    cargo build --release
+                    cp ./target/release/generator-mavlink-plan ./generated-executables/flight-route-planner-22"

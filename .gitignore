@@ -1,4 +1,5 @@
 /target
+/generated-executables
 
 *.plan
 plan-generator*

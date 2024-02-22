@@ -12,4 +12,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y curl build-essential libssl-dev pkg-config libclang-dev libproj-dev
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
-RUN rustup install ${RUST_VERSION} && rustup default ${RUST_VERSION}
+COPY ./src/ /home/generator-mavlink-plan/src
+COPY ./Cargo.lock /home/generator-mavlink-plan/Cargo.lock
+COPY ./Cargo.toml /home/generator-mavlink-plan/Cargo.toml
