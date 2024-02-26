@@ -1,5 +1,7 @@
 /target
-/generated-executables
+/flight-route-planner-*/
 
 *.plan
 plan-generator*
+
+*.desktop

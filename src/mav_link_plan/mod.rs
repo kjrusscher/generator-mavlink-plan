@@ -22,8 +22,19 @@ pub enum MavCmd {
 #[repr(u16)]
 #[allow(non_camel_case_types)]
 pub enum MavFrame {
+    MAV_FRAME_GLOBAL = 0,
+    MAV_FRAME_LOCAL_NED = 1,
+    MAV_FRAME_MISSION = 2,
     MAV_FRAME_GLOBAL_RELATIVE_ALT = 3,
+    MAV_FRAME_LOCAL_ENU = 4,
+    MAV_FRAME_GLOBAL_INT = 5,
+    MAV_FRAME_GLOBAL_RELATIVE_ALT_INT = 6,
+    MAV_FRAME_LOCAL_OFFSET_NED = 7,
     MAV_FRAME_GLOBAL_TERRAIN_ALT = 10,
+    MAV_FRAME_GLOBAL_TERRAIN_ALT_INT = 11,
+    MAV_FRAME_BODY_FRD = 12,
+    MAV_FRAME_LOCAL_FRD = 20,
+    MAV_FRAME_LOCAL_FLU = 21,
 }
 
 /// Enum mavlink::common::MavFrame does not serialize well to a number. This one does serialize correctly.

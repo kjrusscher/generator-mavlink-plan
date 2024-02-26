@@ -1,28 +1,40 @@
-version: '2.19'
+version: '3.8'
 
 services:
   build-for-20.04:
     image: generator-mavlink-plan:20.04
     build:
       context: .
-      dockerfile: compile.20.04.Dockerfile
+      dockerfile: compile.Dockerfile
+      args:
+        - UBUNTU_VERSION=20.04
     working_dir: /home/generator-mavlink-plan/
     volumes:
-      - ${PWD}/generated-executables:/home/generator-mavlink-plan/generated-executables:rw
+      - ${PWD}/flight-route-planner-20:/home/generator-mavlink-plan/flight-route-planner-20:rw
     command: >
       /bin/bash -c "cargo add proj@0.14;
                     cargo build --release;
-                    cp ./target/release/generator-mavlink-plan ./generated-executables/flight-route-planner-20"
+                    cp ./target/release/generator-mavlink-plan ./flight-route-planner-20/flight-route-planner;
+                    cp ./resources/flight-route-planner.png ./flight-route-planner-20/flight-route-planner.png;
+                    cp ./resources/install.sh ./flight-route-planner-20/install.sh;
+                    cp ./resources/uninstall.sh ./flight-route-planner-20/uninstall.sh;
+                    mkdir ./flight-route-planner-20/plan-bestanden"
 
   build-for-22.04:
     image: generator-mavlink-plan:22.04
     build:
       context: .
-      dockerfile: compile.22.04.Dockerfile
+      dockerfile: compile.Dockerfile
+      args:
+        - UBUNTU_VERSION=22.04
     working_dir: /home/generator-mavlink-plan/
     volumes:
-      - ${PWD}/generated-executables:/home/generator-mavlink-plan/generated-executables:rw
+      - ${PWD}/flight-route-planner-22:/home/generator-mavlink-plan/flight-route-planner-22:rw
     command: >
       /bin/bash -c "cargo add proj@0.25;
-                    cargo build --release
-                    cp ./target/release/generator-mavlink-plan ./generated-executables/flight-route-planner-22"
+                    cargo build --release;
+                    cp ./target/release/generator-mavlink-plan ./flight-route-planner-22/flight-route-planner;
+                    cp ./resources/flight-route-planner.png ./flight-route-planner-22/flight-route-planner.png;
+                    cp ./resources/install.sh ./flight-route-planner-22/install.sh;
+                    cp ./resources/uninstall.sh ./flight-route-planner-22/uninstall.sh;
+                    mkdir ./flight-route-planner-22/plan-bestanden"
