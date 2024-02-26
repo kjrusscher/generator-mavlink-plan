@@ -3,12 +3,28 @@
 ```
 docker-compose up build-for-20.04
 ```
-This results in executable plan-generator-20-04.
+This compiles the application and puts the following files and directory in `flight-route-planner-20`:
+- flight-route-planner (executable)
+- install.sh 
+- uninstall.sh
+- flight-route-planner.png (icon for .desktop file)
+- plan-bestanden (directory for .plan files)
+
+`./install.sh` creates `flight-route-planner.desktop` with links to the `flight-route-planner-20` folder.
+These are the steps to make it work on Ubuntu 20.04:
+- Set permission of `./install.sh` to executable, either via the file browser or with `chmod +x`.
+- Go to `preferences->behaviour->executable text files` in the file browser and select `ask each time`.
+- Run `./install.sh` by double clicking it in the file browser.
+- Create shortcut for `~/.local/share/application/flight-plan-generator.desktop` on Desktop.
+- Right click shortcut and select `Allow launch`.
+- Application can now be found in launcher.
+
 ## For Ubuntu 22.04
 ```
 docker-compose up build-for-22.04
 ```
-This results in executable plan-generator-22-04.
+This results in executable plan-generator-22-04. 
+Running the `./install.sh` file will make the desktop application visible in launcher.
 
 # Other documentation
 ## Avy Parameters
