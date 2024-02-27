@@ -11,7 +11,7 @@ This compiles the application and puts the following files and directory in `fli
 - plan-bestanden (directory for .plan files)
 
 `./install.sh` creates `flight-route-planner.desktop` with links to the `flight-route-planner-20` folder.
-These are the steps to make it work on Ubuntu 20.04:
+These are the manual steps to make it work on Ubuntu 20.04 (this is documentation, it's now part of the install script):
 - Set permission of `./install.sh` to executable, either via the file browser or with `chmod +x`.
 - Go to `preferences->behaviour->executable text files` in the file browser and select `ask each time`.
 - Run `./install.sh` by double clicking it in the file browser.

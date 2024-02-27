@@ -17,7 +17,9 @@ services:
                     cp ./target/release/generator-mavlink-plan ./flight-route-planner-20/flight-route-planner;
                     cp ./resources/flight-route-planner.png ./flight-route-planner-20/flight-route-planner.png;
                     cp ./resources/install.sh ./flight-route-planner-20/install.sh;
+                    chmod a+x ./flight-route-planner-20/install.sh;
                     cp ./resources/uninstall.sh ./flight-route-planner-20/uninstall.sh;
+                    chmod a+x ./flight-route-planner-20/uninstall.sh;
                     mkdir ./flight-route-planner-20/plan-bestanden"
 
   build-for-22.04:
@@ -36,5 +38,7 @@ services:
                     cp ./target/release/generator-mavlink-plan ./flight-route-planner-22/flight-route-planner;
                     cp ./resources/flight-route-planner.png ./flight-route-planner-22/flight-route-planner.png;
                     cp ./resources/install.sh ./flight-route-planner-22/install.sh;
+                    chmod a+x ./flight-route-planner-22/install.sh;
                     cp ./resources/uninstall.sh ./flight-route-planner-22/uninstall.sh;
+                    chmod a+x ./flight-route-planner-22/uninstall.sh;
                     mkdir ./flight-route-planner-22/plan-bestanden"
