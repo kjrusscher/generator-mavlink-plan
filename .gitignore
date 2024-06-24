@@ -2,6 +2,7 @@
 /flight-route-planner-*/
 
 *.plan
+*.zip
 plan-generator*
 
 *.desktop
